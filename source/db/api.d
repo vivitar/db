@@ -2,7 +2,6 @@ module db.api;
 
 public import std.variant;
 public import db.uri;
-//public import .versioning;
 
 import std.algorithm;
 import std.conv;
@@ -112,18 +111,6 @@ class DbQuery {
   bool next()     { return _result is null ? false : _result.next(); }
   bool last()     { return _result is null ? false : _result.last(); }
   bool nextSet()  { return _result is null ? false : _result.nextSet(); }
-//QString   executedQuery() const
-//void  finish()
-//bool  isActive() const
-//bool  isForwardOnly() const
-//bool  isNull(int field) const
-//bool  isSelect() const
-//bool  isValid() const
-//QSql::NumericalPrecisionPolicy  numericalPrecisionPolicy() const
-//QSqlRecord  record() const
-
-//void  setForwardOnly(bool forward)
-
 }
 
 class Database {
@@ -135,11 +122,6 @@ class Database {
     Transactions = 4,
     Cursors = 5,
     PreparedQueries = 6,
-//QSqlDriver::BatchOperations 8 Whether the driver supports batched operations, see QSqlQuery::execBatch()
-//QSqlDriver::SimpleLocking 9 Whether the driver disallows a write lock on a table while other queries have a read lock on it.
-//QSqlDriver::LowPrecisionNumbers 10  Whether the driver allows fetching numerical values with low precision.
-//QSqlDriver::EventNotifications  11  Whether the driver supports database event notifications.
-//QSqlDriver::FinishQuery 12  Whether the driver can do any low-level resource cleanup when QSqlQuery::finish() is called.
     MultipleResultSets = 20
   }
   enum NumericPrecision {
@@ -156,9 +138,6 @@ class Database {
     DbError           _error;
     DbPool.Connect*   _connect;
     NumericPrecision  _precision;
-//  DbIndex   primaryIndex(const QString & tablename) const
-//  DbRecord  record(const QString & tablename) const
-//  string[]  tables(QSql::TableType type = QSql::Tables) const
   }
   static Database opCall(URI uri)    { return new Database(uri); }
   static Database opCall(string uri) { return new Database(uri); }

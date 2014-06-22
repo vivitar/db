@@ -18,7 +18,6 @@ interface DbDriver {
   @property DbError   error()  const;
   @property void*     handle();
   @property DbResult  result();
-//string    databaseName() const
   bool hasFeature(Database.Feature);
 
   bool transactionBegin();
@@ -27,20 +26,6 @@ interface DbDriver {
 
   bool open(URI uri);
   void close();
-//  DbResult createResult();
-// QString   escapeIdentifier(const QString & identifier, IdentifierType type) const
-// QString   formatValue(const QSqlField & field, bool trimStrings = false) const
-// bool  isIdentifierEscaped(const QString & identifier, IdentifierType type) const
-
-// QSqlIndex   primaryIndex(const QString & tableName) const
-// QSqlRecord  record(const QString & tableName) const
-// QString   sqlStatement(StatementType type, const QString & tableName, const QSqlRecord & rec, bool preparedStatement) const
-// QString   stripDelimiters(const QString & identifier, IdentifierType type) const
-// string[]   tables(QSql::TableType tableType);
-
-// QStringList   subscribedToNotifications() const
-// bool  subscribeToNotification(const QString & name)
-// bool  unsubscribeFromNotification(const QString & name)
 }
 
 mixin template DbDriverMixin() {
@@ -92,32 +77,6 @@ interface DbResult {
   bool nextSet(); 
 
   Variant opIndex(ulong index);
-//QSqlResult(const QSqlDbDriver * db)
-//const QSqlDbDriver *  DbDriver() const
-//QString   executedQuery() const
-//virtual bool  fetch(int index) = 0
-//virtual bool  fetchFirst() = 0
-//virtual bool  fetchLast() = 0
-//virtual bool  fetchNext()
-//virtual bool  fetchPrevious()
-//bool  hasOutValues() const
-//bool  isActive() const
-//bool  isForwardOnly() const
-//virtual bool  isNull(int index) = 0
-//bool  isSelect() const
-//bool  isValid() const
-//QString   lastQuery() const
-//virtual int   numRowsAffected() = 0
-//virtual bool  prepare(const QString & query)
-//virtual QSqlRecord  record() const
-//virtual bool  reset(const QString & query) = 0
-//void  resetBindCount()
-//virtual bool  savePrepare(const QString & query)
-//virtual void  setActive(bool active)
-//virtual void  setAt(int index)
-//virtual void  setForwardOnly(bool forward)
-//virtual void  seterror(const QSqlError & error)
-//virtual void  setSelect(bool select)
 }
 
 
