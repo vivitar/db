@@ -1,6 +1,7 @@
 module db.interfaces;
 
 public import db.api;
+public import db.versioning;
 
 import std.regex;
 
