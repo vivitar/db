@@ -1,5 +1,6 @@
 {
 	"name" : "db",
 	"description" : "D database API",
-	"targetType": "library"
+	"targetType": "library",
+	"license":"MIT"
 }
