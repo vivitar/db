@@ -139,9 +139,12 @@ class Database {
     DbPool.Connect*   _connect;
     NumericPrecision  _precision;
   }
+  static bool regDriver(DbDriverCreator creator) {
+    DbDriverCreators ~= creator;
+    return true;
+  }
   static Database opCall(URI uri)    { return new Database(uri); }
   static Database opCall(string uri) { return new Database(uri); }
-
   private this(string id, URI uri, DbPool.Connect* connect) {
     _poolId  = id;
     _uri     = uri;
@@ -171,10 +174,7 @@ class Database {
       delete _driver;
     }
   }
-  static bool regDriver(DbDriverCreator creator) {
-    DbDriverCreators ~= creator;
-    return true;
-  }
+
 
   @property auto poolId()  const { return _poolId; }
   @property auto isOpen()  const { return _driver is  null ? false : _driver.isOpen; }
