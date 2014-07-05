@@ -5,7 +5,7 @@ public import db.versioning;
 
 import std.regex;
 
-auto   regexDbParam = ctRegex!(`\$(\w+)`, "g");
+auto   regexDbParam = ctRegex!(`\{(\w+)\}`, "g");
 
 interface DbDriverCreator {
   DbDriver  create();
