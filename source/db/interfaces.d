@@ -5,7 +5,7 @@ public import db.versioning;
 
 import std.regex;
 
-auto regexDbParam = ctRegex!(`\{(\w+)\}`, "g");
+auto regexDbParam = ctRegex!(`\$\{(\w+)\}`, "g");
 
 interface DbDriverCreator
 {
@@ -21,6 +21,7 @@ interface DbDriver
     @property bool isPrepared() const;
     @property void* handle();
     @property string name() const;
+    @property string lastQuery() const;
     @property DbError error() const;
     @property DbResult result();
 
@@ -30,6 +31,7 @@ interface DbDriver
     bool transactionRollback();
 
     bool prepare(string query);
+    bool exec(string query);
     bool exec(Variant[string] params = (Variant[string]).init);
     void clear();
     
@@ -45,7 +47,7 @@ interface DbResult
     @property ulong rowsAffectedCount() const;
     @property ulong fieldsCount() const;
     @property string[] fieldsNames();
-    @property string   lastQuery() const;
+    @property string   query() const;
     @property Variant  lastInsertId();
     @property NumPrecision numPrecision() const;
     @property NumPrecision numPrecision(Database.NumPrecision p);
@@ -72,6 +74,7 @@ mixin template DbDriverMixin()
         URI                 _uri;
         DbDriverCreator     _creator;
         DbError             _error;
+        string              _lastQuery;
         string[]            _paramsTokens;
         string[]            _paramsKeys;
     }
@@ -130,13 +133,6 @@ mixin template DbDriverMixin()
     private void cleanup() {
         _paramsTokens.length = 0;
         _paramsKeys.length   = 0;  
-        _result._row      = 0;
-        _result._length   = 0;
-        _result._firstFetch   = false;
-        _result._fieldsCount  = 0;
-        _result._fieldsTypes.length  = 0;
-        _result._lastQuery.length    = 0;
-        _result._fieldsNames.length  = 0;
     }
 }
 
@@ -151,12 +147,10 @@ mixin template DbResultMixin()
         ulong           _fieldsCount;
         ulong           _affectedCount;
         DbError         _error;
-        string          _lastQuery;
+        string          _query;
         string[]        _fieldsNames = [];
         NumPrecision	_precision;
     }
-
-
 
     @property ulong length() const
     {
@@ -183,9 +177,9 @@ mixin template DbResultMixin()
         return _fieldsNames;
     }
 
-    @property string lastQuery() const
+    @property string query() const
     {
-        return _lastQuery;
+        return _query;
     }
 
     @property NumPrecision numPrecision() const {

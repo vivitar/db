@@ -92,15 +92,15 @@ struct DbError
 
 /// Databse
 class Database {
-      enum Feature
-      {
-          unicode  = 0,
-        resultSize = 1,
-        blob = 2,
-        lastInsertId = 3,
-        transactions = 4,
-        cursors = 5,
-        preparedQueries = 6,
+    enum Feature
+    {
+        unicode            = 0,
+        resultSize         = 1,
+        blob               = 2,
+        lastInsertId       = 3,
+        transactions       = 4,
+        cursors            = 5,
+        preparedQueries    = 6,
         multipleResultSets = 20
     }
 
@@ -118,9 +118,7 @@ class Database {
         string           _poolId;
         URI              _uri;
         DbDriver         _driver;
-        DbError          _error;
         DbPool.Connect*  _connect;
-        NumPrecision     _precision;
     }
 
     static bool regDriver(DbDriverCreator creator)
@@ -167,7 +165,7 @@ class Database {
     }
 
     ~this() {
-        if (_connect != null) {
+        if (_connect !is null) {
             _connect.busy = false;
         } else {
             delete _driver;
@@ -181,12 +179,7 @@ class Database {
 
     @property auto isOpen()  const
     {
-        return _driver is  null ? false : _driver.isOpen;
-    }
-
-    @property auto isValid() const
-    {
-        return _driver !is null;
+        return _driver.isOpen;
     }
 
     @property auto uri()     const
@@ -196,7 +189,7 @@ class Database {
 
     @property auto error() const
     {
-        return _driver is null ? _error : _driver.error;
+        return _driver.error;
     }
 
     @property auto driver()
@@ -206,58 +199,53 @@ class Database {
 
     @property auto numPrecision()
     {
-        return _driver is null ? NumPrecision.f64 : _driver.result.numPrecision;
+        return _driver.result.numPrecision;
     }
 
     @property auto numPrecision(Database.NumPrecision p)
     {
-        return _driver is null ? numPrecision.common : _driver.result.numPrecision(p);
+        return _driver.result.numPrecision(p);
     }
 
     bool hasFeature(Database.Feature f)
     {
-        return _driver is null ? false : _driver.hasFeature(f);
+        return _driver.hasFeature(f);
     }
 
     bool  transaction()
     {
-        return _driver is null ? false : _driver.transactionBegin();
+        return _driver.transactionBegin();
     }
 
     bool commit()
     {
-        return _driver is null ? false : _driver.transactionCommit();
+        return _driver.transactionCommit();
     }
 
     bool rollback() {
-        return _driver is null ? false : _driver.transactionRollback();
+        return _driver.transactionRollback();
     }
 
     bool open(string username = "", string password = "")
     {
-        return _driver is null ? false : _driver.open(_uri);
+        return _driver.open(_uri);
     }
 
-    bool close()
+    void close()
     {
-        auto result = false;
-        if (_connect != null)
+        if (_connect !is null)
         {
-            _error = DbError(DbError.Type.pool, "Can't close connection in pool");
+            throw new DbException(DbError.Type.pool, "Can't close connection in pool");
         }
         else
         {
-            if (_driver !is null) {
-                _driver.close();
-            }
-            result = true;
+            _driver.close();
         }
-        return result;
     }
 
     bool prepare(string query)
     {
-        return _driver is null ? false : _driver.prepare(query);
+        return _driver.prepare(query);
     }
 
     bool exec(Variant[] params)
@@ -273,22 +261,25 @@ class Database {
 
     bool exec(Variant[string] params = (Variant[string]).init)
     {
-        return _driver is null ? false : _driver.exec(params);
+        return _driver.exec(params);
     }
 
     bool exec(string query, Variant[] params)
     {
+        if (!params.length) {
+            return exec(query);
+        } 
         return prepare(query) && exec(params);
     }
 
     bool exec(string query, Variant[string] params = (Variant[string]).init)
     {
+        if (!params.length) {
+            return exec(query);
+        } 
         return prepare(query) && exec(params);
     }
     DbResult result() {
-        if (_driver is null) {
-            throw new DbException(DbError.Type.connection, "Database is not open");
-        }
         return _driver.result;
     }
 }
@@ -305,7 +296,7 @@ class DbPool {
         {
             string          id;
             URI             uri;
-            DbDriverCreator    creator;
+            DbDriverCreator creator;
             uint            maxCon;
             Connect*[]      connections;
         };
@@ -332,10 +323,10 @@ class DbPool {
         return true;
     }
 
-    bool del(string id)
-    {
-        return false;
-    }
+//    bool del(string id)
+//    {
+//        return false;
+//    }
 
     Database db(string id)
     {
