@@ -1140,22 +1140,22 @@ struct URI {
     assert(e.toEncoded() == s);
   }
 
-  /// TODO: operators
+	/// TODO: operators
 }
 ///
 unittest
 {
-  // Basic
-  URI u = "scheme://user:pass@hostname:1234/path?query=string#_fragment_";
-  assert(u.scheme == "scheme");
-  assert(u.authority == "user:pass@hostname:1234");
-  assert(u.userInfo == "user:pass");
-  assert(u.resource == "hostname:1234");
-  assert(u.username == "user");
-  assert(u.password == "pass");
-  assert(u.host == "hostname");
-  assert(u.port == 1234);
-  assert(u.path == "/path");
-  assert(u.query == "query=string");
-  assert(u.fragment == "_fragment_");
+  	// Basic
+  	URI u = "scheme://user:pass@hostname:1234/path?query=string#_fragment_";
+  	assert(u.scheme == "scheme");
+  	assert(u.authority == "user:pass@hostname:1234");
+  	assert(u.userInfo == "user:pass");
+  	assert(u.resource == "hostname:1234");
+  	assert(u.username == "user");
+  	assert(u.password == "pass");
+  	assert(u.host == "hostname");
+  	assert(u.port == 1234);
+  	assert(u.path == "/path");
+	assert(u.query == "query=string");
+	assert(u.fragment == "_fragment_");
 }
