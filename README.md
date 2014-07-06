@@ -4,7 +4,7 @@ db - Concept (unstable)
 About
 =====
 D language databse connection package, contains only base classes, interfaces, and mixin for creare database drivers.
-But allows work with diffirent databAses (if drivers present) with single interface.
+But allows work with diffirent databases (if drivers present) with single interface.
 
 Single connection
 =================
@@ -15,22 +15,22 @@ For e.g. if driver for target database exists.
 
     URI uri1 = "postgresql://postgres@127.0.0.1/postgres";
     URI uri2 = "mysql://postgres@127.0.0.1/test1";
+
     Database db1 = Database(uri1);
     Database db2 = Database(uri2);
 
-    if (!db1.open) {
-      writeln(db1.error);
-    } else {
-      auto query1 = db1.query("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a");
-      // or
-      auto query2 = new DbQuery(db1);
-      // or
-      auto query3 = new DbQuery(db1, "SELECT 1");
+    if (!db1.open)
+    {
+        writeln(db1.error);
+    }
+    else
+    {
+        auto query1 = db1.query("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a");
 
-      // foreach in nearest plans =)
-      while (query1.next) {
-        writeln(text("a=", query[0], " a_inc=", query["a_inc"]));
-      }
+        // foreach in nearest plans =)
+        foreach(row: query1) {
+          writeln(text("a=", row[0], " a_inc=", query["a_inc"]));
+        }
     }
 
 
@@ -48,6 +48,7 @@ Pool example:
 
     // Create pull named "default" with connection defined by uri1 and max con limit is 100
     dbPool.add("default", uri1, 100);
+
     // Create pull named "second" with connection defined by uri2 and without connections limit
     dbPool.add("second", uri2) ;
 
@@ -63,6 +64,7 @@ Pool example:
     auto db3 = dbPool.db("second");
 
     ....
+
     // Destructors marks connections as "free", but no closes
     delete db1;
     delete db2;
