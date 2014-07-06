@@ -25,10 +25,9 @@ For e.g. if driver for target database exists.
     }
     else
     {
-        auto query1 = db1.query("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a");
+        db1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a");
 
-        // foreach in nearest plans =)
-        foreach(row: query1) {
+        foreach (row: db1.result) {
           writeln(text("a=", row[0], " a_inc=", query["a_inc"]));
         }
     }

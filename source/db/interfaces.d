@@ -18,6 +18,7 @@ interface DbDriver
 {
     alias Database.Feature Feature;
     @property bool isOpen() const;
+    @property bool isPrepared() const;
     @property void* handle();
     @property string name() const;
     @property DbError error() const;
@@ -28,6 +29,10 @@ interface DbDriver
     bool transactionCommit();
     bool transactionRollback();
 
+    bool prepare(string query);
+    bool exec(Variant[string] params = (Variant[string]).init);
+    void clear();
+    
     bool open(URI uri);
     void close();
 }
@@ -35,18 +40,15 @@ interface DbDriver
 interface DbResult
 {
     alias Database.NumPrecision NumPrecision;
+
     @property ulong length() const;
     @property ulong rowsAffectedCount() const;
     @property ulong fieldsCount() const;
-    @property DbError  error()  const;
     @property string[] fieldsNames();
+    @property string   lastQuery() const;
     @property Variant  lastInsertId();
     @property NumPrecision numPrecision() const;
     @property NumPrecision numPrecision(Database.NumPrecision p);
-
-    bool prepare(string query);
-    bool exec(Variant[string] params = (Variant[string]).init);
-    void clear();
 
     bool seek(long index, bool relative = false);
     bool first();
@@ -56,21 +58,27 @@ interface DbResult
     bool nextSet(); 
 
     Variant opIndex(ulong index);
+    Variant opIndex(string name);
+
+    int opApply(scope int delegate(DbResult) dg);
 }
 
 mixin template DbDriverMixin()
 {
     private
     {
-        Version           _version;
-        URI               _uri;
-        DbDriverCreator   _creator;
-        DbError           _error;
+        bool                _isPrepared;
+        Version             _version;
+        URI                 _uri;
+        DbDriverCreator     _creator;
+        DbError             _error;
+        string[]            _paramsTokens;
+        string[]            _paramsKeys;
     }
 
-    @property string name() const
+    @property bool isPrepared() const
     {
-        return _creator.name;
+        return _isPrepared;
     }
 
     @property bool isOpen() const
@@ -93,6 +101,11 @@ mixin template DbDriverMixin()
         return _result;
     }
 
+    @property string name() const
+    {
+        return _creator.name;
+    }
+    
   	bool transactionBegin()
     {
         return !hasFeature(Feature.transactions) ? false : exec("BEGIN");
@@ -113,7 +126,18 @@ mixin template DbDriverMixin()
         if (_error.type != DbError.Type.none) {
             _error = DbError(DbError.Type.none);
         }
-    } 
+    }
+    private void cleanup() {
+        _paramsTokens.length = 0;
+        _paramsKeys.length   = 0;  
+        _result._row      = 0;
+        _result._length   = 0;
+        _result._firstFetch   = false;
+        _result._fieldsCount  = 0;
+        _result._fieldsTypes.length  = 0;
+        _result._lastQuery.length    = 0;
+        _result._fieldsNames.length  = 0;
+    }
 }
 
 mixin template DbResultMixin()
@@ -127,20 +151,21 @@ mixin template DbResultMixin()
         ulong           _fieldsCount;
         ulong           _affectedCount;
         DbError         _error;
+        string          _lastQuery;
         string[]        _fieldsNames = [];
-        string[]        _paramsTokens;
-        string[]        _paramsKeys;
         NumPrecision	_precision;
+    }
+
+
+
+    @property ulong length() const
+    {
+        return _length;
     }
 
     @property DbError error() const
     {
         return _error;
-    }
-
-    @property ulong length() const
-    {
-        return _length;
     }
 
     @property ulong rowsAffectedCount() const
@@ -158,11 +183,16 @@ mixin template DbResultMixin()
         return _fieldsNames;
     }
 
-  	@property NumPrecision numPrecision() const {
+    @property string lastQuery() const
+    {
+        return _lastQuery;
+    }
+
+    @property NumPrecision numPrecision() const {
         return _precision;
     }
 
-    @property Database.NumPrecision numPrecision(Database.NumPrecision p) {
+    @property NumPrecision numPrecision(NumPrecision p) {
         return _precision = p;
     }
 
@@ -221,27 +251,16 @@ mixin template DbResultMixin()
     bool nextSet(){
         return false;
     }
-private:
-    void cleanup() {
-        _row      = 0;
-        _length   = 0;
-        _firstFetch   = false;
-        _fieldsCount  = 0;
-        _fieldsTypes.length  = 0;
-        _paramsTokens.length = 0;
-        _paramsKeys.length   = 0;  
-        _fieldsNames.length  = 0;
-    }
 
-    void errorClear() {
-        if (_error.type != DbError.Type.none) {
-            _error = DbError(DbError.Type.none);
+    int opApply(scope int delegate(DbResult) dg) {
+        int  result;
+        auto len = length;
+        for (size_t i = 0; i < len; ++i) {
+            next();
+            result = dg(cast(DbResult) this);
+            if (result)
+                break;
         }
-    }
-
-    void checkForError(string txt, bool ok, DbError.Type t = DbError.Type.statement) {
-        if (!ok) {
-            errorTake(t, txt);
-        }
+        return result;
     }
 }
