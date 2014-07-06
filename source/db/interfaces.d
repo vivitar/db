@@ -108,6 +108,11 @@ mixin template DbDriverMixin()
     {
         return _creator.name;
     }
+
+    @property string lastQuery() const
+    {
+        return _lastQuery;
+    }
     
   	bool transactionBegin()
     {
