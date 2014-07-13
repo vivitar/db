@@ -171,7 +171,6 @@ class Database {
     }
 
     ~this() {
-        debug writeln("Database.~this: ", *_connect);
         if (_connect !is null) {
             _connect.busy = false;
         } else {
