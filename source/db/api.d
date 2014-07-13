@@ -7,6 +7,12 @@ import std.algorithm;
 import std.conv;
 import db.interfaces;
 
+
+debug {
+  import std.stdio;
+}
+
+
 DbDriverCreator[] DbDriverCreators;
 
 class DbException: Exception
@@ -34,7 +40,7 @@ class DbException: Exception
     {
         return _msg;
     }
-    
+
     @safe pure nothrow this()
     {
         super("Db Exception");
@@ -165,6 +171,7 @@ class Database {
     }
 
     ~this() {
+        debug writeln("Database.~this: ", *_connect);
         if (_connect !is null) {
             _connect.busy = false;
         } else {
@@ -226,8 +233,12 @@ class Database {
         return _driver.transactionRollback();
     }
 
-    bool open(string username = "", string password = "")
+    bool open()
     {
+        if (isOpen)
+        {
+            return true;
+        }
         return _driver.open(_uri);
     }
 
@@ -268,7 +279,7 @@ class Database {
     {
         if (!params.length) {
             return exec(query);
-        } 
+        }
         return prepare(query) && exec(params);
     }
 
@@ -276,7 +287,7 @@ class Database {
     {
         if (!params.length) {
             return exec(query);
-        } 
+        }
         return prepare(query) && exec(params);
     }
     DbResult result() {
@@ -300,7 +311,7 @@ class DbPool {
             uint            maxCon;
             Connect*[]      connections;
         };
-        Pool*[string]     _pools;
+        Pool[string]        _pools;
     }
 
     bool add(string id, URI uri, uint maxCon = 0)
@@ -319,7 +330,7 @@ class DbPool {
         {
             throw new DbException(DbError.Type.driver, "Driver '" ~ s ~ "' not found");
         }
-        _pools[id] = new Pool(id, uri, creator, maxCon);
+        _pools[id] = Pool(id, uri, creator, maxCon);
         return true;
     }
 
@@ -336,7 +347,7 @@ class DbPool {
             throw new DbException(DbError.Type.pool, "Pool '" ~ id ~ "' not found");
         }
         Connect* connect;
-        foreach (conn; (*pool).connections)
+        foreach (conn; pool.connections)
         {
               if (conn.busy)
               {
@@ -345,10 +356,10 @@ class DbPool {
               conn.busy = true;
               connect   = conn;
           }
-        if (connect is null && (!(*pool).maxCon || (*pool).maxCon > (*pool).connections.length))
+        if (connect is null && (!pool.maxCon || pool.maxCon > pool.connections.length))
         {
-            (*pool).connections ~= new Connect(true, (*pool).creator.create());
-            connect = (*pool).connections[$ - 1];
+            pool.connections ~= new Connect(true, pool.creator.create());
+            connect = pool.connections[$ - 1];
         }
         if (connect !is null) {
             return new Database(id, (*pool).uri, connect);
