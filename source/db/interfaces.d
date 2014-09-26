@@ -43,23 +43,23 @@ interface DbResult
 {
     alias Database.NumPrecision NumPrecision;
 
-    @property ulong length() const;
-    @property ulong rowsAffectedCount() const;
-    @property ulong fieldsCount() const;
+    @property uint length() const;
+    @property uint rowsAffectedCount() const;
+    @property uint fieldsCount() const;
     @property string[] fieldsNames();
     @property string   query() const;
     @property Variant  lastInsertId();
     @property NumPrecision numPrecision() const;
     @property NumPrecision numPrecision(Database.NumPrecision p);
 
-    bool seek(long index, bool relative = false);
+    bool seek(int index, bool relative = false);
     bool first();
     bool previous();
     bool next();
     bool last();
     bool nextSet(); 
 
-    Variant opIndex(ulong index);
+    Variant opIndex(uint index);
     Variant opIndex(string name);
 
     int opApply(scope int delegate(DbResult) dg);
@@ -147,17 +147,17 @@ mixin template DbResultMixin()
     private
     {
         bool            _firstFetch;
-        ulong           _row;
-        ulong           _length;
-        ulong           _fieldsCount;
-        ulong           _affectedCount;
+        uint            _row;
+        uint            _length;
+        uint            _fieldsCount;
+        uint            _affectedCount;
         DbError         _error;
         string          _query;
         string[]        _fieldsNames = [];
         NumPrecision	_precision;
     }
 
-    @property ulong length() const
+    @property uint length() const
     {
         return _length;
     }
@@ -167,12 +167,12 @@ mixin template DbResultMixin()
         return _error;
     }
 
-    @property ulong rowsAffectedCount() const
+    @property uint rowsAffectedCount() const
     {
         return _affectedCount;
     }
 
-    @property ulong fieldsCount() const
+    @property uint fieldsCount() const
     {
         return _fieldsCount;
     }
@@ -195,7 +195,7 @@ mixin template DbResultMixin()
         return _precision = p;
     }
 
-    bool seek(long pos, bool relative = false)
+    bool seek(int pos, bool relative = false)
     {
         if (_length == 0) {
             return false;
