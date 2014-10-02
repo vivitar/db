@@ -869,7 +869,7 @@ unittest
     /// ditto
     @property auto query(string q)
     {
-        _query.clear();
+        _query = (string[][string]).init;
 
         foreach (pairs; split(q, "&"))
         {
@@ -880,7 +880,6 @@ unittest
                 _query[(kv[0])] ~= kv.length > 1 ? kv[1] : "";
             }
         }
-
         return query;
     }
     ///
@@ -1163,7 +1162,7 @@ unittest
         _password.length = 0;
         _path.length     = 0;
         _port            = 0;
-        _query.clear();
+        _query           = (string[][string]).init;
     }
 
     /// To string representation

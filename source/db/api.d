@@ -54,6 +54,14 @@ class DbException: Exception
     }
 }
 
+void enforceDb(bool chk, DbException.Type type, string msg)
+{
+    if (!chk)
+    {
+        throw new DbException(type, msg);
+    }
+}
+
 /// DbError
 struct DbError
 {
@@ -165,16 +173,14 @@ class Database {
             }
         }
         _uri = uri;
-        if (_driver is null) {
-            throw new DbException(DbError.Type.driver, "Driver '" ~ s ~ "' not found");
-        }
+        enforceDb(_driver !is null, DbError.Type.driver, "Driver '" ~ s ~ "' not found");
     }
 
     ~this() {
         if (_connect !is null) {
             _connect.busy = false;
         } else {
-            delete _driver;
+           _driver.destroy();
         }
     }
 
@@ -243,14 +249,8 @@ class Database {
 
     void close()
     {
-        if (_connect !is null)
-        {
-            throw new DbException(DbError.Type.pool, "Can't close connection in pool");
-        }
-        else
-        {
-            _driver.close();
-        }
+        enforceDb(_connect is null, DbError.Type.pool, "Can't close connection in pool");
+        _driver.close();
     }
 
     bool prepare(string query)
@@ -325,11 +325,11 @@ class DbPool {
                 break;
             }
         }
-        if (creator is null)
-        {
-            throw new DbException(DbError.Type.driver, "Driver '" ~ s ~ "' not found");
-        }
+
+        enforceDb(creator !is null, DbError.Type.driver, "Driver '" ~ s ~ "' not found");
+
         _pools[id] = Pool(id, uri, creator, maxCon);
+
         return true;
     }
 
@@ -341,10 +341,9 @@ class DbPool {
     Database db(string id)
     {
         auto pool = id in _pools;
-        if (pool is null)
-        {
-            throw new DbException(DbError.Type.pool, "Pool '" ~ id ~ "' not found");
-        }
+        
+        enforceDb(pool !is null, DbError.Type.pool, "Pool '" ~ id ~ "' not found");
+
         Connect* connect;
         foreach (conn; pool.connections)
         {
@@ -360,9 +359,7 @@ class DbPool {
             pool.connections ~= new Connect(true, pool.creator.create());
             connect = pool.connections[$ - 1];
         }
-        if (connect !is null) {
-            return new Database(id, (*pool).uri, connect);
-        }
-        throw new DbException(DbError.Type.pool, "Pool '" ~ id ~ "' is busy");
+        enforceDb(connect !is null, DbError.Type.pool, "Pool '" ~ id ~ "' is busy");
+        return new Database(id, (*pool).uri, connect);
     }
 }
