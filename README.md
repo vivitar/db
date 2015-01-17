@@ -15,7 +15,7 @@ For e.g. if driver for target database exists.
 
     void main()
     {
-        auto db1 = new Database("postgresql://postgres:Le6uuraijas9muph@dutov.org/main");
+        auto db1 = new Database("postgresql://postgres@127.0.0.1/test");
         if (!db1.open)
         {
             writeln(db1.error);
