@@ -10,25 +10,71 @@ Single connection
 =================
 For e.g. if driver for target database exists.
 
-    import db;
     import std.stdio;
+    import postgresql;
 
-    URI uri1 = "postgresql://postgres@127.0.0.1/postgres";
-    URI uri2 = "mysql://postgres@127.0.0.1/test1";
-
-    Database db1 = Database(uri1);
-    Database db2 = Database(uri2);
-
-    if (!db1.open)
+    void main()
     {
-        writeln(db1.error);
-    }
-    else
-    {
-        db1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a");
+        auto db1 = new Database("postgresql://postgres:Le6uuraijas9muph@dutov.org/main");
+        if (!db1.open)
+        {
+            writeln(db1.error);
+            return;
+        }
 
-        foreach (row: db1.result) {
-          writeln(text("a=", row[0], " a_inc=", query["a_inc"]));
+        if(!db1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a"))
+        {
+            writeln(db1.error);
+            return;
+        }
+
+        writeln("Driver.lastQuery: ", db1.driver.lastQuery);
+        writeln("Result.query:     ", db1.result.query);
+        writeln("Result.length:    ", db1.result.length);
+
+        foreach (row; db1.result)
+        {
+           writeln("Result(Positional) 0=", row[0], " 1=", row[1]);
+           writeln("Result(Named)      a=", row["a"], " a_inc=", row["a_inc"]);
+        }
+
+        /*
+         * Prepared statements
+         */
+        
+        // Force begin transaction
+        db1.transaction();
+        db1.exec("CREATE TEMP TABLE tmp_users(
+            id        SERIAL  NOT NULL PRIMARY KEY,
+            is_active BOOL    NOT NULL,
+            login     VARCHAR NOT NULL
+        )");
+        
+        db1.prepare("INSERT INTO tmp_users (is_active, login) VALUES (${0}, ${1})");
+        
+        if (!db1.execPrepared(true,  "root")
+         || !db1.execPrepared(true,  "postgres")
+         || !db1.execPrepared(false, "anon"))
+        {
+            // Rolback transaction
+            db1.rollback();
+        }
+        else
+        {
+            // Commit transaction
+            db1.commit();
+        }
+        
+        db1.exec("SELECT * FROM tmp_users");
+
+        writeln("Result.length: ", db1.result.length);
+
+        writeln(" id  | is_active | login");
+        writeln("-------------------------");
+
+        foreach (row; db1.result)
+        {
+            writefln("%4s | %-9s | %s ", row["id"].get!int, row["is_active"].get!bool, row["login"].get!string);
         }
     }
 
@@ -40,8 +86,8 @@ Pool example:
     import db;
     import std.stdio;
 
-    URI uri1 = "postgresql://postgres@127.0.0.1/postgres";
-    URI uri2 = "mysql://postgres@127.0.0.1/test1";
+    string uri1 = "postgresql://postgres@127.0.0.1/postgres";
+    string uri2 = "mysql://postgres@127.0.0.1/test1";
 
     auto dbPool = new DbPool;
 
@@ -65,9 +111,9 @@ Pool example:
     ....
 
     // Destructors marks connections as "free", but no closes
-    delete db1;
-    delete db2;
-    delete db3;
+    db1.destroy();
+    db2.destroy();
+    db3.destroy();
 
     // At now we have two free connections in pool "second", and one in pool "default"
 

@@ -32,7 +32,7 @@ interface DbDriver
 
     bool prepare(string query);
     bool exec(string query);
-    bool exec(Variant[string] params = (Variant[string]).init);
+    bool exec(Variant[string] params = null);
     void clear();
     
     bool open(URI uri);
