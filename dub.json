@@ -2,5 +2,12 @@
 	"name" : "db",
 	"description" : "D database API",
 	"targetType": "library",
-	"license":"MIT"
+	"license":"MIT",
+	"configurations": [{
+            "name": "db-postgresql",
+            "targetType": "library",
+            "versions": ["PostgreSQLDriver"],
+            "lflags": ["-lpq"]
+        }
+    ]
 }

@@ -8,7 +8,6 @@ public import db.uri;
 import std.algorithm;
 import std.conv;
 import db.interfaces;
-import db.utils;
 
 
 debug
@@ -264,7 +263,7 @@ class Database
 
     bool execPrepared(A ...)(A args)
     {
-    	auto params = args2variant(args);
+    	auto params = variantArray(args);
         Variant[string] tmp;
         
         foreach (i; 0 .. params.length)
@@ -279,15 +278,15 @@ class Database
         return _driver.exec(params);
     }
 
-    bool exec(A...)(string query, A args)
-    {
-    	auto params = args2variant(args);
-        Variant[string] tmp;
-        
-        foreach (i; 0 .. params.length)
-        {
-        	tmp[to!string(i)] = params[i];
-        }
+	bool exec(A...)(string query, A args)
+	{
+		auto params = variantArray(args);
+		Variant[string] tmp;
+
+		foreach (i; 0 .. params.length)
+		{
+			tmp[to!string(i)] = params[i];
+		}
 		return prepare(query) && execPrepared(tmp);
 	}
 

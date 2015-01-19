@@ -8,10 +8,17 @@ But allows work with diffirent databases (if drivers present) with single interf
 
 Single connection
 =================
-For e.g. if driver for target database exists.
+dub.json
+
+    "dependencies" : {
+        "db":">=0.1.7"
+    },
+    versions:["PostgreSQLDriver"]
+
+main.d
 
     import std.stdio;
-    import postgresql;
+    import db;
 
     void main()
     {
@@ -117,8 +124,8 @@ Pool example:
 
     // At now we have two free connections in pool "second", and one in pool "default"
 
-Drivers
-=======
+Included drivers
+================
 
-* [PostgreSQL](https://github.com/anton-dutov/db-postgresql)
+* PostgreSQL
 
