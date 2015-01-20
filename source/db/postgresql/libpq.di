@@ -1,4 +1,4 @@
-module libpq;
+module db.postgresql.libpq;
 
 import std.c.stdio : FILE;
 

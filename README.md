@@ -1,4 +1,4 @@
-db - Concept (unstable)
+db - Concept (unstable API)
 =======================
 
 About
@@ -19,7 +19,6 @@ main.d
 
     import std.stdio;
     import db;
-
     void main()
     {
         auto db1 = new Database("postgresql://postgres@127.0.0.1/test");

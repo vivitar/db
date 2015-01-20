@@ -2,20 +2,22 @@ module db.postgresql;
 
 version (PostgreSQLDriver):
 
-public import db.interfaces;
-public import std.datetime;
-
+import db.interfaces;
 import db.postgresql.libpq;
 
 import std.algorithm;
+import std.datetime;
 import std.array;
 import std.conv;
 import std.string;
 import std.regex;
 
-debug import std.stdio;
-
 auto reVer = ctRegex!(`(\d+).(\d+)(.(\d+))?`);
+
+version (DbDebug)
+{
+	import std.stdio;
+}
 
 shared static this()
 {
@@ -24,18 +26,22 @@ shared static this()
 
 class PostgreSQLDriverCreator: DbDriverCreator
 {
-	@property string name() const pure
+	@property string name() const pure nothrow
 	{
 		return "postgresql";
 	}
 
-	@property string[] aliases() const pure
+	@property string[] aliases() const pure nothrow
 	{
 		return ["psql", "pgsql", "postgres"];
 	}
 
 	DbDriver create()
 	{
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriverCreator.create");
+		}
 		return new PostgreSQLDriver(this);
 	}
 }
@@ -46,21 +52,26 @@ class PostgreSQLDriver: DbDriver
 
 	private
 	{
-		PGconn*           _handle;
-		PGresult*         _pgResult;
-		PostgreSQLResult  _result;
-		string            _queryName;
+		PGconn*             _handle;
+		string              _queryName;
+		PostgreSQLResult[]  _results;
 	}
 
 	this(PostgreSQLDriverCreator creator)
 	{
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.this");
+		}
 		_creator = creator;
-		_result  = new PostgreSQLResult(this);
 	}
 
 	~this()
 	{
-		_result.destroy();
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.~this");
+		}
 		close();
 	}
 
@@ -84,6 +95,10 @@ class PostgreSQLDriver: DbDriver
 
 	bool open(URI u)
 	{
+		if (isOpen)
+		{
+			close();
+		}
 		_uri  = u;
 		string uri;
 		uri ~= " host="   ~ (_uri.host.length ? _uri.host : "127.0.0.1");
@@ -102,20 +117,20 @@ class PostgreSQLDriver: DbDriver
 		auto result = (PQstatus(_handle) == ConnStatusType.CONNECTION_OK);
 		if (result)
 		{
-			if (exec("SELECT version()"))
-			{
-				auto m = to!string(_result[0]).match(reVer);
-				if (m.captures.length)
-				{
-					auto p = m.captures[4].length ? m.captures[4] : "0";
-					_version = Version(
-						to!ubyte(m.captures[1]),
-						to!ubyte(m.captures[2]),
-						to!ubyte(p),
-						Version.ReleaseLevel.release
-					);
-				}
-			}
+//			if (exec("SELECT version()"))
+//			{
+//				auto m = to!string(_result[0]).match(reVer);
+//				if (m.captures.length)
+//				{
+//					auto p = m.captures[4].length ? m.captures[4] : "0";
+//					_version = Version(
+//						to!ubyte(m.captures[1]),
+//						to!ubyte(m.captures[2]),
+//						to!ubyte(p),
+//						Version.ReleaseLevel.release
+//					);
+//				}
+//			}
 			exec("SET CLIENT_ENCODING TO 'UNICODE'");
 			exec("SET DATESTYLE TO 'ISO'");
 		}
@@ -127,29 +142,119 @@ class PostgreSQLDriver: DbDriver
 		return result;
 	}
 
-    void clear() {
-        if (_pgResult != null)
-        {
-            PQclear(_pgResult);
-            _pgResult = null;
-        }
-        cleanup();
+	void close()
+	{
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.close");
+		}
+
+//		foreach(r; _results)
+//		{
+//			r.clear();
+//		}
+
+		if (_handle != null)
+		{
+			PQfinish(_handle);
+			_handle = null;
+		}
+	}
+
+	DbResult mkResult()
+	{
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.mkResult");
+		}
+		auto result = new PostgreSQLResult(this);
+		_results ~= result;
+		return result;
+	}
+
+    private bool exec(string query)
+	{
+		if (!isOpen)
+		{
+			return false;
+		}
+
+		auto result = PQexec(_handle, toStringz(query));
+		switch(PQresultStatus(result))
+		{
+		case ExecStatusType.PGRES_COMMAND_OK:
+			return true;
+		case ExecStatusType.PGRES_TUPLES_OK:
+			return true;
+			default: 
+		}
+		return false;
+	}
+
+    private void errorTake(DbError.Type t)
+    {
+        _error = DbError(t, to!string(PQerrorMessage(_handle)));
+    }
+}
+
+class PostgreSQLResult: DbResult
+{
+    mixin DbResultMixin;
+    private
+    {
+		PGresult*         	_handle;
+        bool                _fetch;
+        PostgreSQLDriver    _driver;
+        Oid[]               _fieldsTypes;
     }
 
-    void close()
+    this(PostgreSQLDriver  driver)
     {
-        clear();
-        if (_handle != null)
-        {
-            PQfinish(_handle);
-            _handle = null;
-        }
+    	version (DbDebug)
+		{
+			writefln("PostgreSQLResult.this");
+		}
+        _driver = driver;
     }
 
-    bool prepare(string query)
+    ~this()
     {
-        clear();
-        _lastQuery = query;
+    	version (DbDebug)
+		{
+			writefln("PostgreSQLResult.~this");
+		}
+    }
+
+    @property Variant lastInsertId()
+    {
+        if (_handle)
+        {
+            Oid id = PQoidValue(_handle);
+            if (id) // not InvalidOid
+            {
+                return Variant(id);
+            }
+        }
+        return Variant();
+    }
+
+
+	bool prepare(string query)
+	{
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.prepare");
+		}
+
+		clear();
+
+		if (!_driver.isOpen)
+		{
+			return false;
+		}
+
+		_query = query;
+
         bool hasIndexes = false;
         bool hasStrings = false;
         foreach(c; match(query, regexDbParam)) {
@@ -161,8 +266,8 @@ class PostgreSQLDriver: DbDriver
             query = query.replace(token, "$" ~ to!string(_paramsTokens.countUntil(token) + 1));
         }
         auto pgResult = PQprepare(
-            _handle,
-            cast(char*)toStringz(_queryName),
+            _driver._handle,
+            cast(char*)toStringz(_queryId),
             cast(char*)toStringz(query),
             cast(int)(_paramsTokens.length),
             cast(Oid*)(null)
@@ -171,20 +276,49 @@ class PostgreSQLDriver: DbDriver
         if (!_isPrepared)
         {
             clear();
-            errorTake(DbError.Type.transaction);
+//            errorTake(DbError.Type.statement);
         }
         PQclear(pgResult);
         return _isPrepared;
     }
 
-    bool exec(Variant[string] params = null)
-    {
-        errorClear();
+	bool exec(string query, Variant[string] params = null)
+	{
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.exec");
+		}
 
-        if (_handle is null)
+		clear();
+
+		if (!_driver.isOpen)
+		{
+			return false;
+		}
+
+		errorClear();
+
+		_query  = query;
+        _handle = PQexec(_driver._handle, toStringz(query));
+        switch(PQresultStatus(_handle)) {
+        case ExecStatusType.PGRES_COMMAND_OK:
+            return true;
+        case ExecStatusType.PGRES_TUPLES_OK:
+            reset();
+            return true;
+        default: 
+        }
+        errorTake(DbError.Type.statement);
+        return false;
+	}
+
+    bool execPrepared(Variant[string] params = null)
+    {
+    	if (_driver.isOpen)
         {
             return false;
         }
+        errorClear();
 
         if (_paramsTokens.length != params.length)
         {
@@ -211,19 +345,19 @@ class PostgreSQLDriver: DbDriver
             }
             formats ~= 0;
         }
-        _pgResult = PQexecPrepared(
-            _handle,
-            cast(char*)toStringz(_queryName),
+        _handle = PQexecPrepared(
+            _driver._handle,
+            cast(char*)toStringz(_queryId),
             nParams,
             values.ptr,
             lengths.ptr,
             formats.ptr,
             0);
-        switch(PQresultStatus(_pgResult)) {
+        switch(PQresultStatus(_handle)) {
         case ExecStatusType.PGRES_COMMAND_OK:
             return true;
         case ExecStatusType.PGRES_TUPLES_OK:
-            _result.reset();
+            reset();
             return true;
         default: 
         }
@@ -231,64 +365,15 @@ class PostgreSQLDriver: DbDriver
         return false;
     }
 
-    bool exec(string query)
-    {
-        errorClear();
-        _pgResult = PQexec(_handle, toStringz(query));
-        switch(PQresultStatus(_pgResult)) {
-        case ExecStatusType.PGRES_COMMAND_OK:
-            return true;
-        case ExecStatusType.PGRES_TUPLES_OK:
-            _result.reset();
-            return true;
-        default: 
-        }
-        errorTake(DbError.Type.statement);
-        return false;
-    }
-
-    private void errorTake(DbError.Type t)
-    {
-        _error = DbError(t, to!string(PQerrorMessage(_handle)));
-    }
-}
-
-class PostgreSQLResult: DbResult
-{
-    mixin DbResultMixin;
-    private
-    {
-        bool                _fetch;
-        PostgreSQLDriver    _driver;
-        Oid[]               _fieldsTypes;
-    }
-
-    this(PostgreSQLDriver  driver)
-    {
-        _driver = driver;
-    }
-
-    @property Variant lastInsertId()
-    {
-        if (_driver._pgResult)
-        {
-            Oid id = PQoidValue(_driver._pgResult);
-            if (id) // not InvalidOid
-            {
-                return Variant(id);
-            }
-        }
-        return Variant();
-    }
 
     Variant opIndex(uint index)
     {
         if ((_driver._handle is null || _row < 0 || _row >= _length || index >= _fieldsCount)
-            || PQgetisnull(_driver._pgResult, cast(int)(_row), cast(int)(index)))
+            || PQgetisnull(_handle, cast(int)(_row), cast(int)(index)))
         {
             return Variant(null);
         }
-        auto str = to!string(cast(char*)(PQgetvalue(_driver._pgResult, cast(int)(_row), cast(int)(index))));
+        auto str = to!string(cast(char*)(PQgetvalue(_handle, cast(int)(_row), cast(int)(index))));
         switch (_fieldsTypes[index])
         {
         case Type.BOOLOID:
@@ -329,7 +414,18 @@ class PostgreSQLResult: DbResult
         return true;
     }
 
-    private void reset() {
+    void clear()
+    {
+        if (_handle != null)
+        {
+            PQclear(_handle);
+            _handle = null;
+        }
+        cleanup();
+    }
+    
+    private void reset()
+    {
         _row      = 0;
         _length   = 0;
         _firstFetch   = false;
@@ -338,19 +434,23 @@ class PostgreSQLResult: DbResult
         _query.length        = 0;
         _fieldsNames.length  = 0;
 
-        if (_driver is null || _driver._pgResult is null)
+        if (!isActive)
         {
             return;
         }
-        _query         = _driver._lastQuery;
-        _length        = PQntuples(_driver._pgResult);
-        _fieldsCount   = PQnfields(_driver._pgResult);
-        _affectedCount = to!uint(to!string(PQcmdTuples(_driver._pgResult)));
+        _length        = PQntuples(_handle);
+        _fieldsCount   = PQnfields(_handle);
+        _affectedCount = to!uint(to!string(PQcmdTuples(_handle)));
         for (int i = 0; i < _fieldsCount; ++i) {
-           _fieldsTypes ~= PQftype(_driver._pgResult, i);
+           _fieldsTypes ~= PQftype(_handle, i);
         }
         for (int i = 0; i < _fieldsCount; ++i) {
-           _fieldsNames ~= to!string(PQfname(_driver._pgResult, i));
+           _fieldsNames ~= to!string(PQfname(_handle, i));
         }
+    }
+
+    private void errorTake(DbError.Type t)
+    {
+        _error = DbError(t, to!string(PQerrorMessage(_driver._handle)));
     }
 }

@@ -9,49 +9,53 @@ auto regexDbParam = ctRegex!(`\$\{(\w+)\}`, "g");
 
 interface DbDriverCreator
 {
-    DbDriver  create();
-    @property string   name() const;
-    @property string[] aliases() const;
+	DbDriver  create();
+	@property string   name() const pure nothrow;
+	@property string[] aliases() const pure nothrow;
 }
 
 interface DbDriver
 {
-    alias Database.Feature Feature;
-    @property bool isOpen() const;
-    @property bool isPrepared() const;
+	alias Database.Feature Feature;
+	@property bool isOpen() const;
     @property void* handle();
     @property string name() const;
-    @property string lastQuery() const;
     @property DbError error() const;
-    @property DbResult result();
 
     bool hasFeature(Database.Feature);
+
     bool transactionBegin();
     bool transactionCommit();
     bool transactionRollback();
 
-    bool prepare(string query);
-    bool exec(string query);
-    bool exec(Variant[string] params = null);
-    void clear();
-    
     bool open(URI uri);
     void close();
+
+    DbResult mkResult();
 }
 
 interface DbResult
 {
     alias Database.NumPrecision NumPrecision;
 
+    @property bool isActive()   const;
+    @property bool isPrepared() const;
+    @property void* handle();
     @property uint length() const;
     @property uint rowsAffectedCount() const;
     @property uint fieldsCount() const;
     @property string[] fieldsNames();
     @property string   query() const;
     @property Variant  lastInsertId();
+    @property DbError  error() const;
     @property NumPrecision numPrecision() const;
     @property NumPrecision numPrecision(Database.NumPrecision p);
 
+    bool exec(string query, Variant[string] params = null);
+    bool prepare(string query);
+    bool execPrepared(Variant[string] params = null);
+    void clear();
+    
     bool seek(int index, bool relative = false);
     bool first();
     bool previous();
@@ -74,14 +78,6 @@ mixin template DbDriverMixin()
         URI                 _uri;
         DbDriverCreator     _creator;
         DbError             _error;
-        string              _lastQuery;
-        string[]            _paramsTokens;
-        string[]            _paramsKeys;
-    }
-
-    @property bool isPrepared() const
-    {
-        return _isPrepared;
     }
 
     @property bool isOpen() const
@@ -99,21 +95,11 @@ mixin template DbDriverMixin()
         return _error;
     }
 
-    @property DbResult result()
-    {
-        return _result;
-    }
-
     @property string name() const
     {
         return _creator.name;
     }
 
-    @property string lastQuery() const
-    {
-        return _lastQuery;
-    }
-    
   	bool transactionBegin()
     {
         return !hasFeature(Feature.transactions) ? false : exec("BEGIN");
@@ -135,10 +121,6 @@ mixin template DbDriverMixin()
             _error = DbError(DbError.Type.none);
         }
     }
-    private void cleanup() {
-        _paramsTokens.length = 0;
-        _paramsKeys.length   = 0;  
-    }
 }
 
 mixin template DbResultMixin()
@@ -146,6 +128,7 @@ mixin template DbResultMixin()
     alias Database.NumPrecision NumPrecision;
     private
     {
+    	bool            _isPrepared;
         bool            _firstFetch;
         uint            _row;
         uint            _length;
@@ -153,8 +136,25 @@ mixin template DbResultMixin()
         uint            _affectedCount;
         DbError         _error;
         string          _query;
+        string          _queryId;
         string[]        _fieldsNames = [];
+        string[]        _paramsTokens;
+        string[]        _paramsKeys;
         NumPrecision	_precision;
+     }
+
+    @property bool isActive() const
+    {
+        return _driver.isOpen && _handle !is null;
+    }
+    @property bool isPrepared() const
+    {
+        return _isPrepared;
+    }
+
+    @property void* handle()
+    {
+        return cast(void*)(_handle);
     }
 
     @property uint length() const
@@ -261,5 +261,17 @@ mixin template DbResultMixin()
                 break;
         }
         return result;
+    }
+
+    private void cleanup() {
+        _paramsTokens.length = 0;
+        _paramsKeys.length   = 0;  
+    }
+
+    private void errorClear()
+    {
+        if (_error.type != DbError.Type.none) {
+            _error = DbError(DbError.Type.none);
+        }
     }
 }

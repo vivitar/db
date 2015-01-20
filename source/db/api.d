@@ -10,11 +10,10 @@ import std.conv;
 import db.interfaces;
 
 
-debug
+version (DbDebug)
 {
-	import std.stdio;
+	import std.stdio: writefln;
 }
-
 
 DbDriverCreator[] DbDriverCreators;
 
@@ -142,6 +141,10 @@ class Database
 
 	static bool regDriver(DbDriverCreator creator)
 	{
+		version (DbDebug)
+		{
+			writefln("Database.regDriver \"%s\", aliases: %s", creator.name, creator.aliases);
+		}
 		DbDriverCreators ~= creator;
 		return true;
 	}
@@ -161,6 +164,10 @@ class Database
 
 	this(string uri)
 	{
+		version (DbDebug)
+		{
+			writefln("Database.this(%s)", uri);
+		}
 		URI  u = uri;
 		auto s = u.scheme;
 		foreach (c; DbDriverCreators)
@@ -177,13 +184,13 @@ class Database
 
 	~this()
 	{
+		version (DbDebug)
+		{
+			writefln("Database.~this");
+		}
 		if (_connect !is null)
 		{
 			_connect.busy = false;
-		}
-		else
-		{
-			_driver.destroy();
 		}
 	}
 
@@ -202,81 +209,117 @@ class Database
 		return _uri;
 	}
 
-    @property auto error() const
+    @property DbError error() const
     {
         return _driver.error;
     }
 
-    @property pure auto driver()
+    @property pure DbDriver driver()
     {
         return _driver;
     }
 
-    @property auto numPrecision()
-    {
-        return _driver.result.numPrecision;
-    }
+//    @property auto numPrecision()
+//    {
+//        return _driver.result.numPrecision;
+//    }
+//
+//    @property auto numPrecision(Database.NumPrecision p)
+//    {
+//        return _driver.result.numPrecision(p);
+//    }
 
-    @property auto numPrecision(Database.NumPrecision p)
-    {
-        return _driver.result.numPrecision(p);
-    }
+	bool hasFeature(Database.Feature f)
+	{
+		return _driver.hasFeature(f);
+	}
 
-    bool hasFeature(Database.Feature f)
-    {
-        return _driver.hasFeature(f);
-    }
+	bool transaction()
+	{
+		version (DbDebug)
+		{
+			writefln("Database.transaction");
+		}
+		return _driver.transactionBegin();
+	}
 
-    bool transaction()
-    {
-        return _driver.transactionBegin();
-    }
+	bool commit()
+	{
+		version (DbDebug)
+		{
+			writefln("Database.commit");
+		}
+		return _driver.transactionCommit();
+	}
 
-    bool commit()
-    {
-        return _driver.transactionCommit();
-    }
+	bool rollback()
+	{
+		version (DbDebug)
+		{
+			writefln("Database.rollback");
+		}
+		return _driver.transactionRollback();
+	}
 
-    bool rollback() {
-        return _driver.transactionRollback();
-    }
+	bool open()
+	{
+		if (isOpen)
+		{
+			version (DbDebug)
+			{
+				writefln("Database.open (Already open, closing)");
+			}
+			close();
+		}
+		auto r = _driver.open(_uri);
+		version (DbDebug)
+		{
+			writefln("Database.open -> %s", r);
+		}
+		return r;
+	}
 
-    bool open()
-    {
-        if (isOpen)
-        {
-            return true;
-        }
-        return _driver.open(_uri);
-    }
+	void close()
+	{
+		version (DbDebug)
+		{
+			writefln("Database.close (%s)", &this);
+		}
+		_driver.close();
+	}
+}
 
-    void close()
-    {
-        enforceDb(_connect is null, DbError.Type.pool, "Can't close connection in pool");
-        _driver.close();
-    }
+class Query
+{
+	private
+	{
+		Database	_db;
+		DbResult	_result;
+	}
 
-    bool prepare(string query)
-    {
-        return _driver.prepare(query);
-    }
+	@property DbError error() const
+	{
+		return _db._driver.error;
+	}
 
-    bool execPrepared(A ...)(A args)
-    {
-    	auto params = variantArray(args);
-        Variant[string] tmp;
-        
-        foreach (i; 0 .. params.length)
-        {
-        	tmp[to!string(i)] = params[i];
-        }
-        return execPrepared(tmp);
-    }
+	this(Database db)
+	{
+		version (DbDebug)
+		{
+			writefln("Query.this");
+		}
+		_db     = db;
+		_result = db._driver.mkResult();
+	}
 
-    bool execPrepared(Variant[string] params)
-    {
-        return _driver.exec(params);
-    }
+	~this()
+	{
+		version (DbDebug)
+		{
+			writefln("Query.~this");
+		}
+//		_result.destroy();
+	}
 
 	bool exec(A...)(string query, A args)
 	{
@@ -287,17 +330,50 @@ class Database
 		{
 			tmp[to!string(i)] = params[i];
 		}
-		return prepare(query) && execPrepared(tmp);
+		return exec(query, tmp);
 	}
 
-    bool exec(string query, Variant[string] params)
-    {
-        return prepare(query) && execPrepared(params);
-    }
-    DbResult result() {
-        return _driver.result;
-    }
+	bool exec(string query, Variant[string] params)
+	{
+		version (DbDebug)
+		{
+			writefln("Query.exec: \"%s\"\nParams: %s", query, params);
+		}
+		return _result.exec(query, params);
+	}
+
+	bool prepare(string query)
+	{
+		return _result.prepare(query);
+	}
+
+	bool execPrepared(A ...)(A args)
+	{
+		auto params = variantArray(args);
+		Variant[string] tmp;
+
+		foreach (i; 0 .. params.length)
+		{
+			tmp[to!string(i)] = params[i];
+		}
+		return execPrepared(tmp);
+	}
+
+	bool execPrepared(Variant[string] params)
+	{
+		version (DbDebug)
+		{
+			writefln("Query.execPrepared: \"%s\"\nParams: %s", _result.query, params);
+		}
+		return _result.execPrepared(params);
+	}
+
+	DbResult result()
+	{
+		return _result;
+	}
 }
+
 
 class DbPool {
     alias Database.regDriver regDriver;

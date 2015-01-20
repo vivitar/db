@@ -1,6 +1,6 @@
 {
 	"name" : "db",
-	"description" : "D database API",
+	"description" : "D database API (PostgrSQL drivers included)",
 	"targetType": "library",
 	"license":"MIT",
 	"configurations": [{
@@ -8,6 +8,11 @@
             "targetType": "library",
             "versions": ["PostgreSQLDriver"],
             "lflags": ["-lpq"]
+        },{
+            "name": "db-sqlite",
+            "targetType": "library",
+            "versions": ["SQLiteDriver"],
+            "lflags": ["-lsqlite3"]
         }
     ]
 }
