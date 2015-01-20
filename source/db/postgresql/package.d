@@ -11,8 +11,7 @@ import std.array;
 import std.conv;
 import std.string;
 import std.regex;
-
-auto reVer = ctRegex!(`(\d+).(\d+)(.(\d+))?`);
+import std.uuid;
 
 version (DbDebug)
 {
@@ -182,11 +181,11 @@ class PostgreSQLDriver: DbDriver
 		auto result = PQexec(_handle, toStringz(query));
 		switch(PQresultStatus(result))
 		{
-		case ExecStatusType.PGRES_COMMAND_OK:
-			return true;
-		case ExecStatusType.PGRES_TUPLES_OK:
-			return true;
-			default: 
+			case ExecStatusType.PGRES_COMMAND_OK:
+			case ExecStatusType.PGRES_TUPLES_OK:
+				PQclear(result);
+				return true;
+				default: 
 		}
 		return false;
 	}
@@ -199,18 +198,18 @@ class PostgreSQLDriver: DbDriver
 
 class PostgreSQLResult: DbResult
 {
-    mixin DbResultMixin;
-    private
-    {
+	mixin DbResultMixin;
+	private
+	{
 		PGresult*         	_handle;
-        bool                _fetch;
-        PostgreSQLDriver    _driver;
-        Oid[]               _fieldsTypes;
-    }
+		bool                _fetch;
+		PostgreSQLDriver    _driver;
+		Oid[]               _fieldsTypes;
+	}
 
-    this(PostgreSQLDriver  driver)
-    {
-    	version (DbDebug)
+	this(PostgreSQLDriver  driver)
+	{
+		version (DbDebug)
 		{
 			writefln("PostgreSQLResult.this");
 		}
@@ -237,7 +236,11 @@ class PostgreSQLResult: DbResult
         }
         return Variant();
     }
-
+//
+//	@property uint rowsAffectedCount()
+//	{
+//		return _affectedCount;
+//	}
 
 	bool prepare(string query)
 	{
@@ -253,6 +256,9 @@ class PostgreSQLResult: DbResult
 			return false;
 		}
 
+		queryIdClear();
+		queryIdGen();
+
 		_query = query;
 
         bool hasIndexes = false;
@@ -265,6 +271,10 @@ class PostgreSQLResult: DbResult
             }
             query = query.replace(token, "$" ~ to!string(_paramsTokens.countUntil(token) + 1));
         }
+        version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.prepare: %s\nReal query: %s\nQueryID: %s", _query, query, _queryId);
+		}
         auto pgResult = PQprepare(
             _driver._handle,
             cast(char*)toStringz(_queryId),
@@ -276,7 +286,7 @@ class PostgreSQLResult: DbResult
         if (!_isPrepared)
         {
             clear();
-//            errorTake(DbError.Type.statement);
+            errorTake(DbError.Type.statement);
         }
         PQclear(pgResult);
         return _isPrepared;
@@ -298,26 +308,25 @@ class PostgreSQLResult: DbResult
 
 		errorClear();
 
-		_query  = query;
-        _handle = PQexec(_driver._handle, toStringz(query));
-        switch(PQresultStatus(_handle)) {
-        case ExecStatusType.PGRES_COMMAND_OK:
-            return true;
-        case ExecStatusType.PGRES_TUPLES_OK:
-            reset();
-            return true;
-        default: 
-        }
-        errorTake(DbError.Type.statement);
-        return false;
+		if (!params.length)
+		{
+			_query  = query;
+			_handle = PQexec(_driver._handle, toStringz(query));
+		}
+		else
+		{
+			return prepare(query) && execPrepared(params);
+		}
+		return takeResult();
 	}
 
     bool execPrepared(Variant[string] params = null)
     {
-    	if (_driver.isOpen)
+    	if (!_driver.isOpen)
         {
             return false;
         }
+
         errorClear();
 
         if (_paramsTokens.length != params.length)
@@ -335,7 +344,7 @@ class PostgreSQLResult: DbResult
             if (ptr == null) {
                 throw new DbException(DbError.Type.statement, "Param key '" ~ k ~ "' not found");
             }
-            string tmp = to!string(*ptr);
+            string tmp = formatValue(*ptr);
             if (ptr.type == typeid(null)) {
               values  ~= null;
               lengths ~= 0;
@@ -345,6 +354,10 @@ class PostgreSQLResult: DbResult
             }
             formats ~= 0;
         }
+        version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.execPrepared\nQueryId: %s", _queryId);
+		}
         _handle = PQexecPrepared(
             _driver._handle,
             cast(char*)toStringz(_queryId),
@@ -353,16 +366,7 @@ class PostgreSQLResult: DbResult
             lengths.ptr,
             formats.ptr,
             0);
-        switch(PQresultStatus(_handle)) {
-        case ExecStatusType.PGRES_COMMAND_OK:
-            return true;
-        case ExecStatusType.PGRES_TUPLES_OK:
-            reset();
-            return true;
-        default: 
-        }
-        errorTake(DbError.Type.statement);
-        return false;
+        return takeResult();
     }
 
 
@@ -423,7 +427,21 @@ class PostgreSQLResult: DbResult
         }
         cleanup();
     }
-    
+
+	private bool takeResult()
+	{
+		switch(PQresultStatus(_handle))
+		{
+        case ExecStatusType.PGRES_COMMAND_OK:
+            return true;
+        case ExecStatusType.PGRES_TUPLES_OK:
+            reset();
+            return true;
+        default: 
+        }
+        errorTake(DbError.Type.statement);
+        return false;
+	}
     private void reset()
     {
         _row      = 0;
@@ -453,4 +471,31 @@ class PostgreSQLResult: DbResult
     {
         _error = DbError(t, to!string(PQerrorMessage(_driver._handle)));
     }
+
+	private void queryIdClear()
+	{
+		if (!_queryId.length)
+			return; 
+		
+		if (!_driver.exec("DEALLOCATE " ~ _queryId))
+		{
+		}
+		_queryId.length = 0;
+	}
+
+	private void queryIdGen()
+	{
+		_queryId = to!string(randomUUID());
+	}
+
+	private string formatValue(Variant v)
+	{
+		if (v.type == typeid(null))
+			return "NULL";
+
+		if (v.type == typeid(bool))
+			return v.get!bool ? "TRUE" : "FALSE";
+
+		return to!string(v);
+	}
 }

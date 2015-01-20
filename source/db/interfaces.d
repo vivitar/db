@@ -263,7 +263,9 @@ mixin template DbResultMixin()
         return result;
     }
 
-    private void cleanup() {
+    private void cleanup()
+    {
+    	_length				 = 0;
         _paramsTokens.length = 0;
         _paramsKeys.length   = 0;  
     }
