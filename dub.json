@@ -3,16 +3,7 @@
 	"description" : "D database API (PostgrSQL drivers included)",
 	"targetType": "library",
 	"license":"MIT",
-	"configurations": [{
-            "name": "db-postgresql",
-            "targetType": "library",
-            "versions": ["PostgreSQLDriver"],
-            "lflags": ["-lpq"]
-        },{
-            "name": "db-sqlite",
-            "targetType": "library",
-            "versions": ["SQLiteDriver"],
-            "lflags": ["-lsqlite3"]
-        }
-    ]
+    "dependencies": {
+        "derelict-pq": ">=1.0.1"
+    }
 }

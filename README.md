@@ -19,49 +19,71 @@ main.d
 
     import std.stdio;
     import db;
+
     void main()
     {
-        auto db1 = new Database("postgresql://postgres@127.0.0.1/test");
+        auto db1 = new Database("postgresql://postgres@127.0.0.1/postgres");
         if (!db1.open)
         {
             writeln(db1.error);
             return;
-        }
+        } 
 
-        if(!db1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a"))
+        void qInfo(Query q)
         {
-            writeln(db1.error);
+            writeln("Query.Error:            ", q.error);
+            writeln("Query.Result.query:     ", q.result.query);
+            writeln("Query.Result.length:    ", q.result.length);
+        }
+        auto query1 = new Query(db1);
+        auto query2 = new Query(db1);
+    //
+        if(!query1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a"))
+        {
+            qInfo(query1);
             return;
         }
+        qInfo(query1);
 
-        writeln("Driver.lastQuery: ", db1.driver.lastQuery);
-        writeln("Result.query:     ", db1.result.query);
-        writeln("Result.length:    ", db1.result.length);
-
-        foreach (row; db1.result)
+        if(!query2.exec("SELECT a, a+1 as a_inc FROM generate_series(10, 30) a")) 
+        {
+            qInfo(query2);
+            return;
+        }
+        qInfo(query2);
+        
+        foreach (row; query1.result)
+        {
+           writeln("Result(Positional) 0=", row[0], " 1=", row[1]);
+           writeln("Result(Named)      a=", row["a"], " a_inc=", row["a_inc"]);
+        }
+        foreach (row; query2.result)
         {
            writeln("Result(Positional) 0=", row[0], " 1=", row[1]);
            writeln("Result(Named)      a=", row["a"], " a_inc=", row["a_inc"]);
         }
 
+        
         /*
          * Prepared statements
          */
-        
+
         // Force begin transaction
         db1.transaction();
-        db1.exec("CREATE TEMP TABLE tmp_users(
+        query1.exec("CREATE TEMP TABLE tmp_users(
             id        SERIAL  NOT NULL PRIMARY KEY,
             is_active BOOL    NOT NULL,
             login     VARCHAR NOT NULL
         )");
         
-        db1.prepare("INSERT INTO tmp_users (is_active, login) VALUES (${0}, ${1})");
+        query1.prepare("INSERT INTO tmp_users (is_active, login) VALUES (${0}, ${1})");
+        writeln(query1.error);
         
-        if (!db1.execPrepared(true,  "root")
-         || !db1.execPrepared(true,  "postgres")
-         || !db1.execPrepared(false, "anon"))
+        if (!query1.execPrepared(true,  "root")
+         || !query1.execPrepared(true,  "postgres")
+         || !query1.execPrepared(false, "anon"))
         {
+            writeln(query1.error);
             // Rolback transaction
             db1.rollback();
         }
@@ -70,15 +92,15 @@ main.d
             // Commit transaction
             db1.commit();
         }
-        
-        db1.exec("SELECT * FROM tmp_users");
 
-        writeln("Result.length: ", db1.result.length);
+        query2.exec("SELECT * FROM tmp_users");
+
+        writeln("Result.length: ", query2.result.length);
 
         writeln(" id  | is_active | login");
         writeln("-------------------------");
 
-        foreach (row; db1.result)
+        foreach (row; query2.result)
         {
             writefln("%4s | %-9s | %s ", row["id"].get!int, row["is_active"].get!bool, row["login"].get!string);
         }

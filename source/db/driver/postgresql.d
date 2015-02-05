@@ -1,9 +1,8 @@
-module db.postgresql;
-
-version (PostgreSQLDriver):
+module db.driver.postgresql;
 
 import db.interfaces;
-import db.postgresql.libpq;
+
+import derelict.pq.pq;
 
 import std.algorithm;
 import std.datetime;
@@ -20,7 +19,12 @@ version (DbDebug)
 
 shared static this()
 {
-	Database.regDriver(new PostgreSQLDriverCreator);
+	DerelictPQ.load();
+
+	if (DerelictPQ.isLoaded)
+	{
+		Database.regDriver(new PostgreSQLDriverCreator);
+	}
 }
 
 class PostgreSQLDriverCreator: DbDriverCreator
@@ -82,11 +86,9 @@ class PostgreSQLDriver: DbDriver
 			case Database.Feature.transactions:
 			case Database.Feature.resultSize:
 			case Database.Feature.lastInsertId:
-				return true;
 			case Database.Feature.preparedQueries:
-				return _version.hash >= 0x08020000; // 8.2;
 			case Database.Feature.blob:
-				return _version.hash >= 0x07010000; // 7.1;
+				return true;
 			default:
 		}
 		return false;
@@ -116,20 +118,6 @@ class PostgreSQLDriver: DbDriver
 		auto result = (PQstatus(_handle) == ConnStatusType.CONNECTION_OK);
 		if (result)
 		{
-//			if (exec("SELECT version()"))
-//			{
-//				auto m = to!string(_result[0]).match(reVer);
-//				if (m.captures.length)
-//				{
-//					auto p = m.captures[4].length ? m.captures[4] : "0";
-//					_version = Version(
-//						to!ubyte(m.captures[1]),
-//						to!ubyte(m.captures[2]),
-//						to!ubyte(p),
-//						Version.ReleaseLevel.release
-//					);
-//				}
-//			}
 			exec("SET CLIENT_ENCODING TO 'UNICODE'");
 			exec("SET DATESTYLE TO 'ISO'");
 		}
@@ -185,7 +173,11 @@ class PostgreSQLDriver: DbDriver
 			case ExecStatusType.PGRES_TUPLES_OK:
 				PQclear(result);
 				return true;
-				default: 
+				default:
+		}
+		version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.exec: FAIL\nQuery: %s\nError: %s", query, to!string(PQerrorMessage(_handle)));
 		}
 		return false;
 	}
@@ -244,11 +236,6 @@ class PostgreSQLResult: DbResult
 
 	bool prepare(string query)
 	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.prepare");
-		}
-
 		clear();
 
 		if (!_driver.isOpen)
@@ -271,10 +258,7 @@ class PostgreSQLResult: DbResult
             }
             query = query.replace(token, "$" ~ to!string(_paramsTokens.countUntil(token) + 1));
         }
-        version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.prepare: %s\nReal query: %s\nQueryID: %s", _query, query, _queryId);
-		}
+
         auto pgResult = PQprepare(
             _driver._handle,
             cast(char*)toStringz(_queryId),
@@ -288,17 +272,16 @@ class PostgreSQLResult: DbResult
             clear();
             errorTake(DbError.Type.statement);
         }
+        version (DbDebug)
+		{
+			writefln("PostgreSQLDriver.prepare: %s\nReal query: %s\nQueryID: %s\nPrepared: %s", _query, query, _queryId, _isPrepared);
+		}
         PQclear(pgResult);
         return _isPrepared;
     }
 
 	bool exec(string query, Variant[string] params = null)
 	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.exec");
-		}
-
 		clear();
 
 		if (!_driver.isOpen)
@@ -310,6 +293,10 @@ class PostgreSQLResult: DbResult
 
 		if (!params.length)
 		{
+			version (DbDebug)
+			{
+				writefln("PostgreSQLDriver.exec: ", query);
+			}
 			_query  = query;
 			_handle = PQexec(_driver._handle, toStringz(query));
 		}
@@ -437,7 +424,7 @@ class PostgreSQLResult: DbResult
         case ExecStatusType.PGRES_TUPLES_OK:
             reset();
             return true;
-        default: 
+        default:
         }
         errorTake(DbError.Type.statement);
         return false;
@@ -475,17 +462,16 @@ class PostgreSQLResult: DbResult
 	private void queryIdClear()
 	{
 		if (!_queryId.length)
-			return; 
-		
-		if (!_driver.exec("DEALLOCATE " ~ _queryId))
-		{
-		}
+			return;
+
+		_driver.exec("DEALLOCATE " ~ _queryId);
+
 		_queryId.length = 0;
 	}
 
 	private void queryIdGen()
 	{
-		_queryId = to!string(randomUUID());
+		_queryId = "qid_" ~ to!string(randomUUID())[0 .. 8];
 	}
 
 	private string formatValue(Variant v)
@@ -498,4 +484,93 @@ class PostgreSQLResult: DbResult
 
 		return to!string(v);
 	}
+}
+
+
+enum Type {
+      BOOLOID  = 16,
+      BYTEAOID = 17,
+      CHAROID  = 18,
+//      NAMEOID   19
+      INT8OID  = 20,
+      INT2OID  = 21,
+      INT2VECTOROID = 22,
+      INT4OID  = 23,
+//      REGPROCOID   24
+      TEXTOID  = 25,
+//      OIDOID   26
+//      TIDOID   27
+//      XIDOID   28
+//      CIDOID   29
+//      OIDVECTOROID   30
+      JSONOID = 114,
+//         XMLOID   142
+//         PGNODETREEOID   194
+//         POINTOID   600
+//         LSEGOID   601
+//         PATHOID   602
+//         BOXOID   603
+//         POLYGONOID   604
+//         LINEOID   628
+      FLOAT4OID = 700,
+      FLOAT8OID = 701,
+//      ABSTIMEOID   702
+//      RELTIMEOID   703
+//      TINTERVALOID   704
+//      UNKNOWNOID   705
+//      CIRCLEOID   718
+//      CASHOID   790
+//      MACADDROID   829
+//      INETOID   869
+//      CIDROID   650
+      INT2ARRAYOID = 1005,
+      INT4ARRAYOID = 1007,
+      TEXTARRAYOID = 1009,
+//      OIDARRAYOID   1028
+      FLOAT4ARRAYOID = 1021,
+//      ACLITEMOID   1033
+//      CSTRINGARRAYOID   1263
+//      BPCHAROID   1042
+      VARCHAROID = 1043,
+      DATEOID = 1082,
+      TIMEOID = 1083,
+      TIMESTAMPOID = 1114,
+      TIMESTAMPTZOID = 1184,
+//      INTERVALOID   1186
+//      TIMETZOID   1266
+//      BITOID   1560
+//      VARBITOID   1562
+      NUMERICOID = 1700,
+//      REFCURSOROID   1790
+//      REGPROCEDUREOID   2202
+//      REGOPEROID   2203
+//      REGOPERATOROID   2204
+//      REGCLASSOID   2205
+//      REGTYPEOID   2206
+//       REGTYPEARRAYOID   2211
+//      UUIDOID   2950
+//      LSNOID   3220
+//      TSVECTOROID   3614
+//      GTSVECTOROID   3642
+//      TSQUERYOID   3615
+//      REGCONFIGOID   3734
+//      REGDICTIONARYOID   3769
+      JSONBOID = 3802,
+//      INT4RANGEOID   3904
+//      RECORDOID   2249
+//      RECORDARRAYOID   2287
+//      CSTRINGOID   2275
+//      ANYOID   2276
+//      ANYARRAYOID   2277
+//      VOIDOID   2278
+//      TRIGGEROID   2279
+//      EVTTRIGGEROID   3838
+//      LANGUAGE_HANDLEROID   2280
+//      INTERNALOID   2281
+//      OPAQUEOID   2282
+//      ANYELEMENTOID   2283
+//      ANYNONARRAYOID   2776
+//      ANYENUMOID   3500
+//      FDW_HANDLEROID   3115
+//      ANYRANGEOID   3831      
 }
