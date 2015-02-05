@@ -14,8 +14,7 @@ dub.json
 
     "dependencies" : {
         "db":">=0.1.7"
-    },
-    versions:["PostgreSQLDriver"]
+    }
 
 main.d
 
