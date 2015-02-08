@@ -5,8 +5,8 @@ db - Concept (unstable API)
 
 About
 =====
-D language databse connection package, contains only base classes, interfaces, and mixin for creare database drivers.
-But allows work with diffirent databases (if drivers present) with single interface.
+D language databse connection package. Like Qt5 database layer.
+Allows work with diffirent databases (if drivers present) with single interface.
 
 Drivers
 =======
@@ -237,8 +237,4 @@ Pool example:
 
     // At now we have two free connections in pool "second", and one in pool "default"
 
-Included drivers
-================
-
-* PostgreSQL
 
