@@ -1,4 +1,4 @@
-db - Concept (unstable API)
+db - Concept
 =======================
 [![Build Status](https://travis-ci.org/anton-dutov/db.svg?branch=master)](https://travis-ci.org/anton-dutov/db)
 

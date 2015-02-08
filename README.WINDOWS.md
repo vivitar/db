@@ -20,7 +20,7 @@ lines
     "dependencies": {
         "db":">=0.1.7"
     },
-    versions:["PostgreSQLDriver"],
+    versions:["USE_POSTGRESQL"],
     "copyFiles-windows-x86":       [
         "C:/Program Files (x86)/PostgreSQL/9.x/lib/libpq.dll",
         "C:/Program Files (x86)/PostgreSQL/9.x/bin/libintl.dll",
