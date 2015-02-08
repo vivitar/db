@@ -1,5 +1,5 @@
-db - Concept
-=======================
+db - DLang Database Layer
+=========================
 [![Build Status](https://travis-ci.org/anton-dutov/db.svg?branch=master)](https://travis-ci.org/anton-dutov/db)
 
 
