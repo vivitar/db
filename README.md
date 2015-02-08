@@ -8,103 +8,194 @@ About
 D language databse connection package, contains only base classes, interfaces, and mixin for creare database drivers.
 But allows work with diffirent databases (if drivers present) with single interface.
 
-Single connection
-=================
+Drivers
+=======
+* SQLite - Basic functions, lib should
+link at compile time manualy (section "libs", that will be fixed in future versions), Version **USE_SQLITE**.
+* PostgreSQL - Complete, lib loads dynamicaly throuth derelict-pq. Version **USE_POSTGRESQL**.
+
+Single connection example
+=========================
 dub.json
 
     "dependencies" : {
-        "db":">=0.1.7"
+        "db":">=0.2.5"
     }
+    "versions": [
+        "USE_DB_DEBUG",
+        "USE_SQLITE",
+        "USE_POSTGRESQL"
+    ],
+    "libs":["sqlite3"]
+
+Where:
+* **USE_DB_DEBUG** enables API debuging output to console.
+* **USE_SQLITE** enables SQLite driver.
+* **USE_POSTGRESQL** enables PostgreSQL driver.
 
 main.d
 
-    import std.stdio;
     import db;
+    import std.stdio;
+
+    void qInfo(Query q)
+    {
+        writeln("Query.Error:         ", q.error);
+        writeln("Query.Result.query:  ", q.result.query);
+        writeln("Query.Result.length: ", q.result.length);
+    }
 
     void main()
     {
-        auto db1 = new Database("postgresql://postgres@127.0.0.1/postgres");
-        if (!db1.open)
-        {
-            writeln(db1.error);
-            return;
-        } 
+        testPostgreSQL();
+        testSQLite();
+    }
 
-        void qInfo(Query q)
+    void testPostgreSQL()
+    {
+        auto db = new Database("postgres://postgres@127.0.0.1/postgres"); 
+        if (!db.open())
         {
-            writeln("Query.Error:            ", q.error);
-            writeln("Query.Result.query:     ", q.result.query);
-            writeln("Query.Result.length:    ", q.result.length);
-        }
-        auto query1 = new Query(db1);
-        auto query2 = new Query(db1);
-    //
-        if(!query1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 10) a"))
-        {
-            qInfo(query1);
+            writefln("SQLite open error: %s", db.error.text);
             return;
         }
-        qInfo(query1);
-
-        if(!query2.exec("SELECT a, a+1 as a_inc FROM generate_series(10, 30) a")) 
-        {
-            qInfo(query2);
-            return;
-        }
-        qInfo(query2);
         
-        foreach (row; query1.result)
+        writefln("db.open: '%s', Driver '%s'", db.uri.path , db.driver.name);
+
+        auto q1 = new Query(db);
+        auto q2 = new Query(db);
+        
+        if(!q1.exec("SELECT a, a+1 as a_inc FROM generate_series(1, 3) a"))
         {
-           writeln("Result(Positional) 0=", row[0], " 1=", row[1]);
-           writeln("Result(Named)      a=", row["a"], " a_inc=", row["a_inc"]);
+            qInfo(q1);
+            return;
         }
-        foreach (row; query2.result)
+            
+        if(!q2.exec("SELECT a, a+1 as a_inc FROM generate_series(500, 505) a")) 
         {
-           writeln("Result(Positional) 0=", row[0], " 1=", row[1]);
-           writeln("Result(Named)      a=", row["a"], " a_inc=", row["a_inc"]);
+            qInfo(q2);
+            return;
+        }
+        qInfo(q1);
+        qInfo(q2);
+        
+        writefln("Result: Positional 0=%s 1=%s Named a=%s a_inc=%s",
+                        q1.result[0], q1.result[1],
+                        q1.result["a"], q1.result["a_inc"]);
+        
+        foreach (row; q1.result)
+        {
+            writefln("Result: Positional 0=%s 1=%s Named a=%s a_inc=%s",
+                        row[0], row[1],
+                        row["a"], row["a_inc"]);
         }
 
-        
+        foreach (row; q2.result)
+        {
+            writefln("Result: Positional 0=%s 1=%s Named a=%s a_inc=%s",
+                        row[0], row[1],
+                        row["a"], row["a_inc"]);
+        }
+
         /*
-         * Prepared statements
-         */
+        * Prepared statements
+        */
 
-        // Force begin transaction
-        db1.transaction();
-        query1.exec("CREATE TEMP TABLE tmp_users(
+        db.transaction();
+        q1.exec("
+        CREATE TEMP TABLE tmp_users(
             id        SERIAL  NOT NULL PRIMARY KEY,
             is_active BOOL    NOT NULL,
             login     VARCHAR NOT NULL
         )");
-        
-        query1.prepare("INSERT INTO tmp_users (is_active, login) VALUES (${0}, ${1})");
-        writeln(query1.error);
-        
-        if (!query1.execPrepared(true,  "root")
-         || !query1.execPrepared(true,  "postgres")
-         || !query1.execPrepared(false, "anon"))
+
+        q1.prepare("INSERT INTO tmp_users (is_active, login) VALUES (${0}, ${1})");
+
+        if (!q1.execPrepared(true,  "root")
+         || !q1.execPrepared(true,  "postgres")
+         || !q1.execPrepared(false, "anon")
+        )
         {
-            writeln(query1.error);
+            writefln("Error: %s", q1.error.text);
             // Rolback transaction
-            db1.rollback();
+            db.rollback();
         }
         else
         {
             // Commit transaction
-            db1.commit();
+            db.commit();
         }
 
-        query2.exec("SELECT * FROM tmp_users");
-
-        writeln("Result.length: ", query2.result.length);
+        q2.exec("SELECT * FROM tmp_users");
+        writeln("Result.text: ", q2.error.text);
+        writeln("Result.length: ", q2.result.length);
 
         writeln(" id  | is_active | login");
         writeln("-------------------------");
 
-        foreach (row; query2.result)
+        foreach (row; q2.result)
         {
             writefln("%4s | %-9s | %s ", row["id"].get!int, row["is_active"].get!bool, row["login"].get!string);
         }
+        q1.destroy();
+        q2.destroy();
+        db.destroy();
+    }
+
+
+    void testSQLite()
+    {
+        auto db = new Database("sqlite:/tmp/test.sqlite"); 
+        if (!db.open())
+        {
+            writefln("SQLite open error: %s", db.error.text);
+            return;
+        }
+
+        auto q1 = new Query(db);
+            
+        q1.exec("SELECT 1 as X");
+        writeln("Query.Error: ", q1.error);
+        writefln("Result: Positional 0=%s Named X=%s", q1.result[0], q1.result["X"]);
+
+            
+        db.transaction();
+        q1.exec("
+        CREATE TEMP TABLE tmp_users(
+            id        INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            is_active BOOL    NOT NULL,
+            login     VARCHAR NOT NULL
+        )");
+        writefln("Table create error: %s", q1.error);
+
+        q1.prepare("INSERT INTO tmp_users (is_active, login) VALUES (${0}, ${1})");
+        writefln("Prepared error: %s", q1.error);
+
+        if (!q1.execPrepared(true,  "root")
+         || !q1.execPrepared(true,  "postgres")
+         || !q1.execPrepared(false, "anon")
+            )
+            {
+                writefln("Error: %s", q1.error.text);
+                // Rolback transaction
+                db.rollback();
+            }
+            else
+            {
+                // Commit transaction
+                db.commit();
+            }
+
+            q1.exec("SELECT * FROM tmp_users");
+
+            writeln(" id  | is_active | login");
+            writeln("-------------------------");
+
+            foreach (row; q1.result)
+            {
+                writefln("%4s | %-9s | %s", row["id"].get!long, row["is_active"].get!string, row["login"].get!string);
+            }
+
     }
 
 

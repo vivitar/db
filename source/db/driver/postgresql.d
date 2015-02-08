@@ -1,5 +1,7 @@
 module db.driver.postgresql;
 
+version (USE_POSTGRESQL):
+
 import db.interfaces;
 
 import derelict.pq.pq;
@@ -12,11 +14,6 @@ import std.string;
 import std.regex;
 import std.uuid;
 
-version (DbDebug)
-{
-	import std.stdio;
-}
-
 shared static this()
 {
 	DerelictPQ.load();
@@ -27,67 +24,25 @@ shared static this()
 	}
 }
 
-class PostgreSQLDriverCreator: DbDriverCreator
+final class PostgreSQLDriverCreator: DbDriverCreator
 {
-	@property string name() const pure nothrow
-	{
-		return "postgresql";
-	}
-
-	@property string[] aliases() const pure nothrow
-	{
-		return ["psql", "pgsql", "postgres"];
-	}
-
-	DbDriver create()
-	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriverCreator.create");
-		}
-		return new PostgreSQLDriver(this);
-	}
+	mixin DbDriverCreatorMixin!("postgresql", ["psql", "pgsql", "postgres"], PostgreSQLDriver);
 }
 
-class PostgreSQLDriver: DbDriver
+final class PostgreSQLDriver: DbDriver
 {
-	mixin DbDriverMixin;
-
-	private
-	{
-		PGconn*             _handle;
-		string              _queryName;
-		PostgreSQLResult[]  _results;
-	}
-
-	this(PostgreSQLDriverCreator creator)
-	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.this");
-		}
-		_creator = creator;
-	}
-
-	~this()
-	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.~this");
-		}
-		close();
-	}
+	mixin DbDriverMixin!(PGconn*, PostgreSQLResult);
 
 	bool hasFeature(Database.Feature f)
 	{
 		switch (f)
 		{
-			case Database.Feature.unicode:
+			case Database.Feature.blob:
+			case Database.Feature.cursors:
 			case Database.Feature.transactions:
 			case Database.Feature.resultSize:
 			case Database.Feature.lastInsertId:
 			case Database.Feature.preparedQueries:
-			case Database.Feature.blob:
 				return true;
 			default:
 		}
@@ -126,37 +81,24 @@ class PostgreSQLDriver: DbDriver
 			errorTake(DbError.Type.connection);
 			close();
 		}
+		dbDebug("%s.open(%s) -> %s [%s]", typeid(this), uri, result, _handle);
 		return result;
 	}
 
 	void close()
 	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.close");
-		}
-
+		dbDebug("%s.close [%s]", typeid(this), _handle);
 //		foreach(r; _results)
 //		{
 //			r.clear();
 //		}
 
-		if (_handle != null)
+		if (_handle !is null)
 		{
 			PQfinish(_handle);
 			_handle = null;
 		}
-	}
 
-	DbResult mkResult()
-	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.mkResult");
-		}
-		auto result = new PostgreSQLResult(this);
-		_results ~= result;
-		return result;
 	}
 
     private bool exec(string query)
@@ -165,6 +107,10 @@ class PostgreSQLDriver: DbDriver
 		{
 			return false;
 		}
+
+		errorClear();
+		
+		dbDebug("%s.exec: %s", typeid(this), query);
 
 		auto result = PQexec(_handle, toStringz(query));
 		switch(PQresultStatus(result))
@@ -175,67 +121,52 @@ class PostgreSQLDriver: DbDriver
 				return true;
 				default:
 		}
-		version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.exec: FAIL\nQuery: %s\nError: %s", query, to!string(PQerrorMessage(_handle)));
-		}
+		errorTake(DbError.Type.transaction);
+		PQclear(result);
 		return false;
 	}
 
-    private void errorTake(DbError.Type t)
-    {
-        _error = DbError(t, to!string(PQerrorMessage(_handle)));
-    }
+	private void errorTake(DbError.Type t)
+	{
+		_error = DbError(t, to!string(PQerrorMessage(_handle)));
+	}
 }
 
-class PostgreSQLResult: DbResult
+final class PostgreSQLResult: DbResult
 {
-	mixin DbResultMixin;
+	mixin DbResultMixin!(PGresult*, PostgreSQLDriver);
 	private
 	{
-		PGresult*         	_handle;
-		bool                _fetch;
-		PostgreSQLDriver    _driver;
-		Oid[]               _fieldsTypes;
+		bool        _fetch;
+		Oid[]       _fieldsTypes;
 	}
 
-	this(PostgreSQLDriver  driver)
-	{
-		version (DbDebug)
-		{
-			writefln("PostgreSQLResult.this");
-		}
-        _driver = driver;
-    }
-
-    ~this()
-    {
-    	version (DbDebug)
-		{
-			writefln("PostgreSQLResult.~this");
-		}
-    }
-
     @property Variant lastInsertId()
-    {
-        if (_handle)
-        {
-            Oid id = PQoidValue(_handle);
-            if (id) // not InvalidOid
-            {
-                return Variant(id);
-            }
-        }
-        return Variant();
-    }
-//
-//	@property uint rowsAffectedCount()
-//	{
-//		return _affectedCount;
-//	}
+	{
+		if (isActive)
+		{
+			Oid id = PQoidValue(_handle);
+			if (id) // not InvalidOid
+			{
+				return Variant(id);
+			}
+		}
+		return Variant();
+	}
+
+	@property ulong affectedRowsLength()
+	{
+		if (isActive)
+		{
+			return to!ulong(to!string(PQcmdTuples(_handle)));
+		}
+		return 0;
+	}
 
 	bool prepare(string query)
 	{
+		_isPrepared = false;
+
 		clear();
 
 		if (!_driver.isOpen)
@@ -243,13 +174,14 @@ class PostgreSQLResult: DbResult
 			return false;
 		}
 
+		errorClear();
 		queryIdClear();
 		queryIdGen();
 
 		_query = query;
 
-        bool hasIndexes = false;
-        bool hasStrings = false;
+//        bool hasIndexes = false;
+//        bool hasStrings = false;
         foreach(c; match(query, regexDbParam)) {
             auto token = c[0], key = c[1];
             if (!_paramsTokens.count(token)) {
@@ -272,17 +204,19 @@ class PostgreSQLResult: DbResult
             clear();
             errorTake(DbError.Type.statement);
         }
-        version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.prepare: %s\nReal query: %s\nQueryID: %s\nPrepared: %s", _query, query, _queryId, _isPrepared);
-		}
+
+        dbDebug("%s.prepare: %s\nReal query: %s\nQueryID: %s\nPrepared: %s", typeid(this), _query, query, _queryId, _isPrepared);
+
         PQclear(pgResult);
         return _isPrepared;
     }
 
 	bool exec(string query, Variant[string] params = null)
 	{
+		_isPrepared = false;
+
 		clear();
+
 
 		if (!_driver.isOpen)
 		{
@@ -293,10 +227,8 @@ class PostgreSQLResult: DbResult
 
 		if (!params.length)
 		{
-			version (DbDebug)
-			{
-				writefln("PostgreSQLDriver.exec: ", query);
-			}
+			dbDebug("%s.exec: %s", typeid(this), query);
+
 			_query  = query;
 			_handle = PQexec(_driver._handle, toStringz(query));
 		}
@@ -307,26 +239,28 @@ class PostgreSQLResult: DbResult
 		return takeResult();
 	}
 
-    bool execPrepared(Variant[string] params = null)
-    {
-    	if (!_driver.isOpen)
-        {
-            return false;
-        }
+	bool execPrepared(Variant[string] params = null)
+	{
+		if (!_driver.isOpen || !isPrepared)
+		{
+			return false;
+		}
 
-        errorClear();
+		clear();
 
-        if (_paramsTokens.length != params.length)
-        {
-            throw new DbException(DbError.Type.statement, "Invalid parameters count");
-        }
+		errorClear();
 
-        char*[]  values;
-        int[]    lengths;
-        int[]    formats;
-        int nParams = cast(int)(_paramsKeys.length);
-        foreach (k; _paramsKeys)
-        {
+		if (_paramsTokens.length != params.length)
+		{
+			throw new DbException(DbError.Type.statement, "Invalid parameters count");
+		}
+
+		char*[]  values;
+		int[]    lengths;
+		int[]    formats;
+		int nParams = cast(int)(_paramsKeys.length);
+		foreach (k; _paramsKeys)
+		{
             auto ptr = k in params;
             if (ptr == null) {
                 throw new DbException(DbError.Type.statement, "Param key '" ~ k ~ "' not found");
@@ -341,13 +275,9 @@ class PostgreSQLResult: DbResult
             }
             formats ~= 0;
         }
-        version (DbDebug)
-		{
-			writefln("PostgreSQLDriver.execPrepared\nQueryId: %s", _queryId);
-		}
-        _handle = PQexecPrepared(
-            _driver._handle,
-            cast(char*)toStringz(_queryId),
+        dbDebug("%s.execPrepared  QueryID: %s, Params: %s", typeid(this), _queryId, params);
+        _handle = PQexecPrepared(_driver._handle,
+        	cast(char*)toStringz(_queryId),
             nParams,
             values.ptr,
             lengths.ptr,
@@ -357,112 +287,122 @@ class PostgreSQLResult: DbResult
     }
 
 
-    Variant opIndex(uint index)
-    {
-        if ((_driver._handle is null || _row < 0 || _row >= _length || index >= _fieldsCount)
-            || PQgetisnull(_handle, cast(int)(_row), cast(int)(index)))
-        {
-            return Variant(null);
-        }
-        auto str = to!string(cast(char*)(PQgetvalue(_handle, cast(int)(_row), cast(int)(index))));
-        switch (_fieldsTypes[index])
-        {
-        case Type.BOOLOID:
-            return Variant(str == "t");
-        case Type.INT2OID:
-        case Type.INT4OID:
-            return Variant(to!int(str));
-        case Type.INT8OID:
-            return Variant(to!int(str));
-        case Type.FLOAT4OID:
-        case Type.FLOAT8OID:
-            return Variant(to!double(str));
-        case Type.NUMERICOID:
-            return Variant(to!real(str));
-        case Type.DATEOID:
-            return Variant(Date.fromISOExtString(str));
-        case Type.TIMESTAMPOID:
-            return Variant(SysTime.fromISOExtString(str.replace(" ", "T")));
-        case Type.TIMESTAMPTZOID:
-            return Variant(SysTime.fromISOExtString(str.replace(" ", "T")));
-        case 1015:
-            return Variant(str[1 .. $ - 1].split(","));
-        case Type.CHAROID:
-        case Type.VARCHAROID:
-        case Type.TEXTOID:
-        default:
-        }
-        return Variant(str);
-    }
+	bool fetch()
+	{
+		_fieldsValues = null;
 
-    Variant opIndex(string name)
-    {
-        return opIndex(cast(uint)(_fieldsNames.countUntil(name)));
-    }
+		if (!isActive)
+		{
+			return false;
+		}
+		
+		if (_row >= _length)
+		{
+			return false;
+		}
 
-    bool fetch()
-    {
-        return true;
-    }
+		foreach(i, t; _fieldsTypes)
+		{
+			if (PQgetisnull(_handle, cast(int)(_row), cast(int)(i)))
+			{
+				_fieldsValues ~= Variant();
+				continue;
+			}
+			auto str = to!string(cast(char*)(PQgetvalue(_handle, cast(int)(_row), cast(int)(i))));
+			switch (t)
+			{
+				case Type.BOOLOID:
+					_fieldsValues ~= Variant(str == "t");
+					continue;
+				case Type.INT2OID:
+				case Type.INT4OID:
+					_fieldsValues ~= Variant(to!int(str));
+					continue;
+				case Type.INT8OID:
+					_fieldsValues ~= Variant(to!int(str));
+					continue;
+				case Type.FLOAT4OID:
+				case Type.FLOAT8OID:
+					_fieldsValues ~= Variant(to!double(str));
+					continue;
+				case Type.NUMERICOID:
+					_fieldsValues ~= Variant(to!real(str));
+					continue;
+				case Type.DATEOID:
+					_fieldsValues ~= Variant(Date.fromISOExtString(str));
+					continue;
+				case Type.TIMESTAMPOID:
+					_fieldsValues ~= Variant(SysTime.fromISOExtString(str.replace(" ", "T")));
+					continue;
+				case Type.TIMESTAMPTZOID:
+					_fieldsValues ~= Variant(SysTime.fromISOExtString(str.replace(" ", "T")));
+					continue;
+				case 1015:
+					_fieldsValues ~= Variant(str[1 .. $ - 1].split(","));
+					continue;
+				case Type.CHAROID:
+				case Type.VARCHAROID:
+				case Type.TEXTOID:
+				default:
+					_fieldsValues ~= Variant(str);
+			}
+		}
+		return true;
+	}
 
-    void clear()
-    {
-        if (_handle != null)
-        {
-            PQclear(_handle);
-            _handle = null;
-        }
-        cleanup();
-    }
+	void clear()
+	{
+		if (_handle !is null)
+		{
+			PQclear(_handle);
+			_handle = null;
+		}
+		cleanup(isPrepared);
+	}
 
 	private bool takeResult()
 	{
+		if (!isActive)
+		{
+			return false;
+		}
 		switch(PQresultStatus(_handle))
 		{
-        case ExecStatusType.PGRES_COMMAND_OK:
-            return true;
-        case ExecStatusType.PGRES_TUPLES_OK:
-            reset();
-            return true;
-        default:
-        }
-        errorTake(DbError.Type.statement);
-        return false;
+			case ExecStatusType.PGRES_COMMAND_OK:
+				return true;
+			case ExecStatusType.PGRES_TUPLES_OK:
+				_length        = PQntuples(_handle);
+				_fieldsCount   = PQnfields(_handle);
+				for (ulong i = 0; i < _fieldsCount; ++i)
+				{
+					auto fName  = to!string(PQfname(_handle, cast(int) i));
+					_fieldsTypes ~= PQftype(_handle, cast(int) i);
+					_fieldsNames ~= fName;
+					_fieldsMap[fName] = i;
+				}
+				if (_length)
+				{
+					fetch();
+//					_firstFetched = false;
+				}
+				return true;
+			default:
+		}
+		errorTake(DbError.Type.statement);
+		return false;
 	}
-    private void reset()
-    {
-        _row      = 0;
-        _length   = 0;
-        _firstFetch   = false;
-        _fieldsCount  = 0;
-        _fieldsTypes.length  = 0;
-        _query.length        = 0;
-        _fieldsNames.length  = 0;
 
-        if (!isActive)
-        {
-            return;
-        }
-        _length        = PQntuples(_handle);
-        _fieldsCount   = PQnfields(_handle);
-        _affectedCount = to!uint(to!string(PQcmdTuples(_handle)));
-        for (int i = 0; i < _fieldsCount; ++i) {
-           _fieldsTypes ~= PQftype(_handle, i);
-        }
-        for (int i = 0; i < _fieldsCount; ++i) {
-           _fieldsNames ~= to!string(PQfname(_handle, i));
-        }
-    }
-
-    private void errorTake(DbError.Type t)
-    {
-        _error = DbError(t, to!string(PQerrorMessage(_driver._handle)));
-    }
+	private void errorTake(DbError.Type t)
+	{
+		_error = DbError(t, to!string(PQerrorMessage(_driver._handle)));
+	}
 
 	private void queryIdClear()
 	{
 		if (!_queryId.length)
+		{
 			return;
+		}
 
 		_driver.exec("DEALLOCATE " ~ _queryId);
 
@@ -477,10 +417,14 @@ class PostgreSQLResult: DbResult
 	private string formatValue(Variant v)
 	{
 		if (v.type == typeid(null))
+		{
 			return "NULL";
+		}
 
 		if (v.type == typeid(bool))
+		{
 			return v.get!bool ? "TRUE" : "FALSE";
+		}
 
 		return to!string(v);
 	}
@@ -572,5 +516,5 @@ enum Type {
 //      ANYNONARRAYOID   2776
 //      ANYENUMOID   3500
 //      FDW_HANDLEROID   3115
-//      ANYRANGEOID   3831      
+//      ANYRANGEOID   3831
 }

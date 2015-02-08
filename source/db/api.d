@@ -112,7 +112,6 @@ class Database
 {
 	enum Feature
 	{
-		unicode            = 0,
 		resultSize         = 1,
 		blob               = 2,
 		lastInsertId       = 3,

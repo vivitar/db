@@ -1,6 +1,6 @@
 {
 	"name" : "db",
-	"description" : "D database API (PostgrSQL drivers included)",
+	"description" : "D database API (SQLite/PostgrSQL drivers included)",
 	"targetType": "library",
 	"license":"MIT",
     "dependencies": {
