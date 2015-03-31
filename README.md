@@ -211,10 +211,10 @@ Pool example:
 
     auto dbPool = new DbPool;
 
-    // Create pull named "default" with connection defined by uri1 and max con limit is 100
+    // Create pool named "default" with connection defined by uri1 and max con limit is 100
     dbPool.add("default", uri1, 100);
 
-    // Create pull named "second" with connection defined by uri2 and without connections limit
+    // Create pool named "second" with connection defined by uri2 and without connections limit
     dbPool.add("second", uri2) ;
 
     // At now no any connections present
