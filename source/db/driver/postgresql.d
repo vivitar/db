@@ -1,8 +1,8 @@
 module db.driver.postgresql;
 
-version (USE_POSTGRESQL):
+//version (USE_POSTGRESQL):
 
-import db.interfaces;
+import db.core;
 
 import derelict.pq.pq;
 
@@ -58,7 +58,7 @@ final class PostgreSQLDriver: DbDriver
 		_uri  = u;
 		string uri;
 		uri ~= " host="   ~ (_uri.host.length ? _uri.host : "127.0.0.1");
-		uri ~= " port="   ~ (_uri.port ? to!string(_uri.port) : "5432");
+		uri ~= " port="   ~ (_uri.port ? _uri.port.to!string : "5432");
 		uri ~= " dbname=" ~ _uri.path.chompPrefix("/");
 		if (_uri.username.length)
 		{

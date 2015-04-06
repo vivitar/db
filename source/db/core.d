@@ -1,4 +1,4 @@
-module db.interfaces;
+module db.core;
 
 public import db.api;
 public import db.versioning;

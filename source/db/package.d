@@ -1,7 +1,7 @@
 module db;
 
 public import db.api;
-public import db.interfaces;
+public import db.core;
 
 //import db.driver.mysql;
 import db.driver.sqlite;

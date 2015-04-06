@@ -1,5 +1,8 @@
 Windows specified configuration
 ===============================
+OBSOLETE
+
+FIXME
 
 PostgreSQL
 ==========

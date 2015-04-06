@@ -7,7 +7,7 @@ public import db.uri;
 
 import std.algorithm;
 import std.conv;
-import db.interfaces;
+import db.core;
 
 
 version (DbDebug)
@@ -298,7 +298,7 @@ class Query
 
 	@property DbError error() const
 	{
-		return _db._driver.error;
+		return _result.error;
 	}
 
 	this(Database db)
