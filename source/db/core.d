@@ -351,7 +351,7 @@ mixin template DbResultMixin(H, D)
 	{
 		if (!isActive || index >= _fieldsValues.length)
 		{
-			return Variant();
+			return Variant(null);
 		}
 		return _fieldsValues[index];
 	}

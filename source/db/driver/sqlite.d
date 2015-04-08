@@ -2,7 +2,7 @@ module db.driver.sqlite;
 
 version (USE_SQLITE):
 
-import db.interfaces;
+import db.core;
 
 import std.algorithm: split, replace, count;
 import std.string: toStringz;
@@ -170,7 +170,7 @@ final class SQLiteResult: DbResult
 				return Variant(id);
 			}
 		}
-		return Variant();
+		return Variant(null);
 	}
 
 	@property ulong affectedRowsLength()

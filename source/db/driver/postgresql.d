@@ -151,7 +151,7 @@ final class PostgreSQLResult: DbResult
 				return Variant(id);
 			}
 		}
-		return Variant();
+		return Variant(null);
 	}
 
 	@property ulong affectedRowsLength()
@@ -305,7 +305,7 @@ final class PostgreSQLResult: DbResult
 		{
 			if (PQgetisnull(_handle, cast(int)(_row), cast(int)(i)))
 			{
-				_fieldsValues ~= Variant();
+				_fieldsValues ~= Variant(null);
 				continue;
 			}
 			auto str = to!string(cast(char*)(PQgetvalue(_handle, cast(int)(_row), cast(int)(i))));
