@@ -1241,7 +1241,7 @@ struct URIQuery
     }
 
     /// Sink-based toString method
-    void toString(scope void delegate(const(char)[]) sink) const pure
+    void toString(scope void delegate(const(char)[]) sink) const
     {
         bool isFirst = true;
         foreach (key, values; _data)

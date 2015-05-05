@@ -363,7 +363,7 @@ mixin template DbResultMixin(H, D)
 		{
 			return opIndex(*index);
 		}
-		return Variant();
+		return Variant(null);
 	}
 	
 	int opApply(scope int delegate(DbResult) dg)
