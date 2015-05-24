@@ -1,6 +1,6 @@
 module db.driver.postgresql;
 
-//version (USE_POSTGRESQL):
+version (USE_POSTGRESQL):
 
 import db.core;
 

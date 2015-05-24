@@ -15,7 +15,7 @@ version (DbDebug)
 	import std.stdio: writefln;
 }
 
-DbDriverCreator[] DbDriverCreators;
+__gshared DbDriverCreator[] DbDriverCreators;
 
 class DbException: Exception
 {
