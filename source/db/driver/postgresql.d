@@ -56,19 +56,7 @@ final class PostgreSQLDriver: DbDriver
 			close();
 		}
 		_uri  = u;
-		string uri;
-		uri ~= " host="   ~ (_uri.host.length ? _uri.host : "127.0.0.1");
-		uri ~= " port="   ~ (_uri.port ? _uri.port.to!string : "5432");
-		uri ~= " dbname=" ~ _uri.path.chompPrefix("/");
-		if (_uri.username.length)
-		{
-			uri ~= " user=" ~ _uri.username;
-		}
-		if (_uri.password.length)
-		{
-			uri ~= " password=" ~ _uri.password;
-		}
-		auto conStr = toStringz(uri);
+		auto conStr = toStringz(_uri.to!string);
 		_handle = PQconnectdb(conStr);
 		auto result = (PQstatus(_handle) == ConnStatusType.CONNECTION_OK);
 		if (result)
@@ -81,7 +69,7 @@ final class PostgreSQLDriver: DbDriver
 			errorTake(DbError.Type.connection);
 			close();
 		}
-		dbDebug("%s.open(%s) -> %s [%s]", typeid(this), uri, result, _handle);
+		dbDebug("%s.open(%s) -> %s [%s]", typeid(this), _uri, result, _handle);
 		return result;
 	}
 
