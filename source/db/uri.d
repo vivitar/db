@@ -585,7 +585,7 @@ struct URI
     {
         struct Opt
         {
-            bool  reqDSlash;
+            bool  reqDSlash    = true;
             bool  reqAuthority;
         }
         string      _scheme;
@@ -603,14 +603,13 @@ struct URI
             Opt opt;
             switch(s)
             {
-                case "ftp", "sftp", "http", "https", "spdy":
-                    opt.reqDSlash    = true;
+                case "ftp", "sftp", "http", "https":
                     opt.reqAuthority = true;
                     break;
                 case "file":
-                    opt.reqDSlash    = true;
                     break;
                 case "mailto":
+                    opt.reqDSlash    = false;
                     opt.reqAuthority = true;
                     break;
                 default:
