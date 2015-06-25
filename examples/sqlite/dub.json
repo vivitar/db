@@ -1,0 +1,14 @@
+{
+	"name": "sqlite",
+	"description": "SQLite example.",
+	"copyright": "Copyright © 2015, Anton Dutov",
+	"authors": ["kein"],
+	"dependencies" : {
+		"db":">=0.2.9"
+	},
+	"versions": [
+		"USE_DB_DEBUG_",
+		"USE_SQLITE"
+	],
+	"libs":["sqlite3"]
+}

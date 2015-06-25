@@ -1,7 +1,15 @@
 .*
+.dub
 
+docs.json
+__dummy.html
 dub.selections.json
 schema.d
+
+examples/sqlite/sqlite
+examples/postgresql/postgresql
+
+
 
 # Compiled Object files
 *.slo

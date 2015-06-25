@@ -1,0 +1,13 @@
+{
+	"name": "postgresql",
+	"description": "PostgreSQL Example",
+	"copyright": "Copyright © 2015, Anton Dutov",
+	"authors": ["Anton Dutov"],
+	"dependencies" : {
+		"db":">=0.2.9"
+	},
+	"versions": [
+		"USE_DB_DEBUG_",
+		"USE_POSTGRESQL"
+	]
+}
