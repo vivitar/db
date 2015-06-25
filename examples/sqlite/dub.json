@@ -4,7 +4,7 @@
 	"copyright": "Copyright © 2015, Anton Dutov",
 	"authors": ["kein"],
 	"dependencies" : {
-		"db":">=0.2.9"
+		"db":">=0.2.11"
 	},
 	"versions": [
 		"USE_DB_DEBUG_",

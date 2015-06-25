@@ -5,10 +5,10 @@ db - DLang Database Layer
 
 About
 =====
-D language databse connection package. Like Qt5 database layer.
+D language database connection package. Like Qt5 database layer.
 Allows work with diffirent databases (if drivers present) with single interface.
 
-See examples folder
+(See examples folder)[https://github.com/anton-dutov/db/tree/master/examples]
 
 Drivers
 =======
