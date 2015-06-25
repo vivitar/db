@@ -4,7 +4,8 @@ version (USE_SQLITE):
 
 import db.core;
 
-import std.algorithm: split, replace, count;
+import std.array: replace;
+import std.algorithm: count;
 import std.string: toStringz;
 import std.regex: match;
 //import std.datetime;
