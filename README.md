@@ -1,4 +1,4 @@
-db - DLang Database Layer
+db - D DataBase Layer
 =========================
 [![Build Status](https://travis-ci.org/anton-dutov/db.svg?branch=master)](https://travis-ci.org/anton-dutov/db)
 
@@ -8,13 +8,12 @@ About
 D language database connection package. Like Qt5 database layer.
 Allows work with diffirent databases (if drivers present) with single interface.
 
-(See examples folder)[https://github.com/anton-dutov/db/tree/master/examples]
+[See examples folder](https://github.com/anton-dutov/db/tree/master/examples)
 
 Drivers
 =======
 * SQLite - Basic functions, lib should link at compile time manualy (section "libs", that will be fixed in future versions), Version **USE_SQLITE**.
 * PostgreSQL - Complete, lib loads dynamicaly throuth derelict-pq. Version **USE_POSTGRESQL**.
-
 
 
 Versions
