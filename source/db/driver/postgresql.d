@@ -51,7 +51,7 @@ final class PostgreSQLDriver: DbDriver
 
 	@property bool isOpen() const
 	{
-		return _handle !is null && PQstatus(_handle) == ConnStatusType.CONNECTION_OK;
+		return _handle !is null && PQstatus(cast(PGconn*)_handle) == ConnStatusType.CONNECTION_OK;
 	}
 
 	bool open(URI u)
@@ -63,7 +63,7 @@ final class PostgreSQLDriver: DbDriver
 		_uri  = u;
 		auto conStr = toStringz(_uri.to!string);
 		_handle = PQconnectdb(conStr);
-		auto result = (PQstatus(_handle) == ConnStatusType.CONNECTION_OK);
+		auto result = isOpen;
 		if (result)
 		{
 			exec("SET CLIENT_ENCODING TO 'UNICODE'");
@@ -209,7 +209,6 @@ final class PostgreSQLResult: DbResult
 		_isPrepared = false;
 
 		clear();
-
 
 		if (!_driver.isOpen)
 		{
