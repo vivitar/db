@@ -1,4 +1,4 @@
-db - D DataBase Layer
+db - D lang Database Layer
 =========================
 [![Build Status](https://travis-ci.org/anton-dutov/db.svg?branch=master)](https://travis-ci.org/anton-dutov/db)
 
@@ -32,7 +32,7 @@ Pool example:
     import std.stdio;
 
     string uri1 = "postgresql://postgres@127.0.0.1/postgres";
-    string uri2 = "mysql://postgres@127.0.0.1/test1";
+    string uri2 = "postgresql://postgres@127.0.0.1/test1";
 
     auto dbPool = new DbPool;
 

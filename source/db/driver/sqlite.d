@@ -2,6 +2,8 @@ module db.driver.sqlite;
 
 version (USE_SQLITE):
 
+pragma(lib, "sqlite3");
+
 import db.core;
 
 import std.array: replace;

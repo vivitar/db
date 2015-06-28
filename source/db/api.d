@@ -419,7 +419,7 @@ class DbPool {
 //        return false;
 //    }
 
-    Database db(string id)
+    Database db(string id, bool autoOpen = false)
     {
         auto pool = id in _pools;
         
@@ -441,6 +441,12 @@ class DbPool {
             connect = pool.connections[$ - 1];
         }
         enforceDb(connect !is null, DbError.Type.pool, "Pool '" ~ id ~ "' is busy");
-        return new Database(id, (*pool).uri, connect);
-    }
+
+		auto newDb = new Database(id, (*pool).uri, connect);
+		if (autoOpen && !newDb.isOpen)
+		{
+			newDb.open();
+		}
+		return newDb;
+	}
 }

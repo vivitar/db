@@ -49,6 +49,11 @@ final class PostgreSQLDriver: DbDriver
 		return false;
 	}
 
+	@property bool isOpen() const
+	{
+		return _handle !is null && PQstatus(_handle) == ConnStatusType.CONNECTION_OK;
+	}
+
 	bool open(URI u)
 	{
 		if (isOpen)
@@ -109,7 +114,7 @@ final class PostgreSQLDriver: DbDriver
 				return true;
 				default:
 		}
-		errorTake(DbError.Type.transaction);
+		errorTake(DbError.Type.statement);
 		PQclear(result);
 		return false;
 	}
