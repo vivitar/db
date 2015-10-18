@@ -13,7 +13,7 @@ void main()
 auto db = new Database("postgres://postgres@127.0.0.1/postgres"); 
     if (!db.open())
     {
-        writefln("SQLite open error: %s", db.error.text);
+        writefln("PostgreSQL open error: %s", db.error.text);
         return;
     }
 
